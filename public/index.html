@@ -10,8 +10,11 @@
     body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
     .container { max-width: 700px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
     h1 { font-size: 2.5em; color: #667eea; text-align: center; margin-bottom: 20px; }
-    .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 16px 32px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 600; }
+    h2 { font-size: 1.8em; color: #333; margin-bottom: 15px; }
+    h3 { font-size: 1.3em; color: #333; margin-bottom: 10px; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 16px 32px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 600; margin: 10px 5px; transition: all 0.2s; }
     .btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(59,130,246,0.4); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .step { background: #f8fafc; border-radius: 16px; padding: 30px; margin: 20px 0; }
     .progress { width: 100%; height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin: 20px 0; }
     .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); transition: width 0.5s; }
@@ -25,6 +28,14 @@
     .mastery-high { color: #059669; }
     .mastery-med { color: #d97706; }
     .mastery-low { color: #dc2626; }
+    input, select, textarea { width: 100%; padding: 12px; margin: 10px 0 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
+    textarea { font-family: monospace; resize: vertical; min-height: 120px; }
+    .result-box { background: white; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0; border-radius: 8px; }
+    .result-box p { margin: 8px 0; }
+    .result-box strong { color: #333; }
+    .result-content { background: #f5f5f5; padding: 12px; border-radius: 6px; margin-top: 10px; line-height: 1.6; max-height: 300px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; }
+    label { display: block; margin-bottom: 10px; font-weight: bold; color: #333; }
   </style>
 </head>
 <body>
@@ -38,6 +49,10 @@ function FinnishMVP() {
   const [answers, setAnswers] = useState({});
   const [knowledgeMap, setKnowledgeMap] = useState(null);
   const [token, setToken] = useState(null);
+  const [translateText, setTranslateText] = useState('I go to the city.');
+  const [translateLevel, setTranslateLevel] = useState('A1');
+  const [translateResult, setTranslateResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const CASE_QUESTIONS = [
     { sentence: "Menen kotiin.", english: "I go home.", options: ['illative','inessive','nominative','genitive'], correct: 'illative' },
@@ -52,11 +67,46 @@ function FinnishMVP() {
       const res = await fetch('/api/user', { method: 'POST' });
       const data = await res.json();
       setToken(data.token);
-      setStep('diagnostic');
+      setStep('menu');
     } catch (e) {
       console.error('Error:', e);
       alert('Server error');
     }
+  }
+
+  async function handleTranslate() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: translateText, level: translateLevel })
+      });
+      const data = await res.json();
+      setTranslateResult(data);
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Translation error');
+    }
+    setLoading(false);
+  }
+
+  async function fetchWebContent(url) {
+    if (!url.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (data.content) {
+        setTranslateText(data.content);
+      } else {
+        alert('Could not fetch content from URL');
+      }
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Error fetching URL');
+    }
+    setLoading(false);
   }
 
   async function submitDiagnostic() {
@@ -77,15 +127,88 @@ function FinnishMVP() {
 
   return (
     <div className="container">
-      <h1>🇫🇮 Finnish Gap Detection</h1>
+      <h1>🇫🇮 Finnish MVP</h1>
 
       {step === 'welcome' && (
         <div className="step">
-          <h2>Ready for Finnish?</h2>
-          <button className="btn" onClick={createUser}>🚀 Start Diagnostic</button>
-          <button className="btn" style={{marginLeft:'15px'}} onClick={() =>
-	setStep('translate')}>📖 Translate Text</button>
-	</div>
+          <h2>Welcome to Finnish Learning</h2>
+          <p style={{marginBottom: '20px', color: '#666'}}>Master Finnish with personalized lessons and translation tools.</p>
+          <button className="btn" onClick={createUser} style={{width: '100%'}}>🚀 Start</button>
+        </div>
+      )}
+
+      {step === 'menu' && (
+        <div className="step">
+          <h2>What would you like to do?</h2>
+          <button className="btn" onClick={() => setStep('translator')} style={{width: '100%', marginBottom: '10px'}}>📚 Translator</button>
+          <button className="btn" onClick={() => {setCurrentQuestion(0); setAnswers({}); setStep('diagnostic');}} style={{width: '100%'}}>🎯 Diagnostic Test</button>
+        </div>
+      )}
+
+      {step === 'translator' && (
+        <div className="step">
+          <h2>📚 Translator</h2>
+          <p style={{marginBottom: '15px', color: '#666'}}>Translate text or web articles to Finnish at your level</p>
+          
+          <div style={{marginBottom: '20px'}}>
+            <label>📎 Paste Web Address (URL):</label>
+            <input 
+              type="text"
+              placeholder="https://example.com/article"
+              disabled={loading}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') fetchWebContent(e.target.value);
+              }}
+              onChange={(e) => {
+                if (e.target.value.trim().length > 5) {
+                  const timer = setTimeout(() => {
+                    fetchWebContent(e.target.value);
+                  }, 1000);
+                  return () => clearTimeout(timer);
+                }
+              }}
+            />
+            <p style={{fontSize: '0.85em', color: '#999', marginTop: '-15px'}}>Press Enter or wait 1 second to fetch content</p>
+          </div>
+
+          <div style={{marginBottom: '20px'}}>
+            <label>✏️ Or paste text directly:</label>
+            <textarea 
+              value={translateText}
+              onChange={(e) => setTranslateText(e.target.value)}
+              placeholder="Paste English text here..."
+              disabled={loading}
+            />
+          </div>
+          
+          <label>Select your Finnish level:</label>
+          <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
+            <option value="A1">A1 (Beginner)</option>
+            <option value="A2">A2 (Elementary)</option>
+            <option value="B1">B1 (Intermediate)</option>
+            <option value="B2">B2 (Upper Intermediate)</option>
+            <option value="C1">C1 (Advanced)</option>
+            <option value="selkosuomi">Selkosuomi (Simplified Finnish)</option>
+          </select>
+          
+          <button className="btn" onClick={handleTranslate} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
+            {loading ? '⏳ Processing...' : '🔄 Translate'}
+          </button>
+
+          {translateResult && (
+            <div className="result-box">
+              <p><strong>✅ Translated to {translateResult.level}:</strong></p>
+              <div className="result-content">
+                {translateResult.finnish}
+              </div>
+              {translateResult.pronunciation && (
+                <p style={{marginTop: '15px', fontSize: '0.9em', color: '#666'}}><strong>🔊 Pronunciation:</strong> {translateResult.pronunciation}</p>
+              )}
+            </div>
+          )}
+
+          <button className="btn" onClick={() => setStep('menu')} style={{width:'100%', marginTop:'20px'}}>← Back to Menu</button>
+        </div>
       )}
 
       {step === 'diagnostic' && (
@@ -108,23 +231,13 @@ function FinnishMVP() {
                   onClick={() => {
                     if(currentQuestion<4) setCurrentQuestion(currentQuestion+1);
                     else submitDiagnostic();
-                  }}>
+                  }}
+                  style={{width: '100%'}}>
             {currentQuestion<4?'Next':'Finish Test'}
           </button>
         </div>
       )}
-	{step === 'translate' && (
-  <div className="step">
-    <h2>📖 Translate Content</h2>
-    <textarea id="englishText" placeholder="Paste English text to translate..." rows="6" style={{width:'100%',padding:'20px',borderRadius:'12px',border:'2px solid #e5e7eb',fontSize:'16px',marginBottom:'20px'}}/>
-    <div style={{textAlign:'center'}}>
-      <button className="btn" onClick={translateToA1}>→ A1 Finnish</button>
-      <button className="btn" style={{marginLeft:'15px'}} onClick={translateToB1}>→ B1 Finnish</button>
-    </div>
-    <div id="translationResult" style={{marginTop:'30px',padding:'20px',background:'#f0f9ff',borderRadius:'12px',borderLeft:'4px solid #3b82f6'}}></div>
-  </div>
-)}
- 
+
       {step === 'knowledge-map' && knowledgeMap && (
         <div className="step">
           <h2>📊 Your Knowledge Map</h2>
@@ -144,7 +257,8 @@ function FinnishMVP() {
               </div>
             ))}
           </div>
-          <button className="btn" onClick={() => setStep('session')}>🎯 Start Illative Session</button>
+          <button className="btn" onClick={() => setStep('session')} style={{width: '100%', marginBottom: '10px'}}>🎯 Start Illative Session</button>
+          <button className="btn" onClick={() => setStep('menu')} style={{width: '100%'}}>← Back to Menu</button>
         </div>
       )}
 
@@ -177,7 +291,7 @@ function FinnishMVP() {
               Illative: <span style={{color:'#10b981'}}>55%</span>
             </div>
             <div>Next Review: <strong>Tomorrow 8AM</strong></div>
-            <button className="btn" onClick={() => setStep('welcome')}>🔄 New Session</button>
+            <button className="btn" onClick={() => setStep('menu')} style={{width: '100%'}}>🔄 Back to Menu</button>
           </div>
         </div>
       )}
@@ -189,3 +303,4 @@ ReactDOM.render(<FinnishMVP />, document.getElementById('root'));
 </script>
 </body>
 </html>
+
