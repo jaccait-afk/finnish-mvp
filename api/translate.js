@@ -14,55 +14,62 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Gemini API key not configured' });
   }
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Translate this English text to Finnish at ${level} level (CEFR framework):
+  // Try models in order
+  const models = [
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+    'gemini-pro',
+    'gemini-pro-vision'
+  ];
+
+  for (const model of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Translate this English text to Finnish at ${level} level (CEFR framework):
 
 "${text}"
 
 Provide ONLY the Finnish translation at this level. For A1, use very simple words and short sentences. For B1+, use more complex vocabulary. For Selkosuomi, use simplified vocabulary with short, clear sentences.`
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 2048
-          }
-        })
+              }]
+            }],
+            generationConfig: {
+              maxOutputTokens: 2048
+            }
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const finnish = data.candidates[0].content.parts[0].text;
+        return res.status(200).json({
+          english: text,
+          finnish: finnish,
+          pronunciation: finnish,
+          level: level,
+          model: model
+        });
       }
-    );
-
-    const data = await response.json();
-    
-    // Debug logging
-    console.log('Gemini response:', JSON.stringify(data, null, 2));
-    
-    if (!response.ok) {
-      console.error('Gemini API error:', data);
-      return res.status(500).json({ 
-        error: 'Gemini API error',
-        details: data.error?.message || 'Unknown error'
-      });
+    } catch (e) {
+      console.log(`Model ${model} failed, trying next...`, e.message);
+      continue;
     }
-
-    const finnish = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Translation failed';
-
-    res.status(200).json({
-      english: text,
-      finnish: finnish,
-      pronunciation: finnish,
-      level: level
-    });
-  } catch (e) {
-    console.error('Translation error:', e);
-    res.status(500).json({ error: `Translation error: ${e.message}` });
   }
+
+  // If all models fail
+  return res.status(500).json({ 
+    error: 'All translation models failed',
+    modelsAttempted: models
+  });
 }
 
