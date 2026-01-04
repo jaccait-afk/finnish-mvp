@@ -40,6 +40,18 @@ Provide ONLY the Finnish translation at this level. For A1, use very simple word
     );
 
     const data = await response.json();
+    
+    // Debug logging
+    console.log('Gemini response:', JSON.stringify(data, null, 2));
+    
+    if (!response.ok) {
+      console.error('Gemini API error:', data);
+      return res.status(500).json({ 
+        error: 'Gemini API error',
+        details: data.error?.message || 'Unknown error'
+      });
+    }
+
     const finnish = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Translation failed';
 
     res.status(200).json({
@@ -49,7 +61,7 @@ Provide ONLY the Finnish translation at this level. For A1, use very simple word
       level: level
     });
   } catch (e) {
-    console.error('Translation error:', e.message);
+    console.error('Translation error:', e);
     res.status(500).json({ error: `Translation error: ${e.message}` });
   }
 }
