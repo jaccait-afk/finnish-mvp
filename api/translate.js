@@ -15,7 +15,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api-free.deepl.com/v1/translate', {
+    // Check if free or pro tier
+    const isFree = apiKey.includes(':fx');
+    const url = isFree 
+      ? 'https://api-free.deepl.com/v1/translate'
+      : 'https://api.deepl.com/v1/translate';
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `DeepL-Auth-Key ${apiKey}`,
@@ -27,13 +33,19 @@ export default async function handler(req, res) {
       })
     });
 
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('DeepL error:', error);
+      return res.status(response.status).json({ error: `DeepL error: ${error}` });
+    }
+
     const data = await response.json();
     const finnish = data.translations?.[0]?.text || 'Translation failed';
 
     res.status(200).json({
       english: text,
       finnish: finnish,
-      pronunciation: finnish, // DeepL doesn't provide pronunciation
+      pronunciation: finnish,
       level
     });
   } catch (e) {
