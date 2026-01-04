@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       english: text,
       finnish: finnish,
       pronunciation: finnish,
-      level
+      level: level
     });
   } catch (e) {
     console.error('Translation error:', e.message);
