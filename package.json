@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "finnish-mvp",
   "version": "1.0.0",
   "scripts": {
@@ -13,3 +14,4 @@
     "jsonwebtoken": "^9.0.2"
   }
 }
+
