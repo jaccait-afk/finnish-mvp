@@ -4,43 +4,18 @@ export default async function handler(req, res) {
   }
 
   const { text, level } = req.body;
-  const apiKey = process.env.DEEPL_API_KEY;
 
   if (!text) {
     return res.status(400).json({ error: 'No text provided' });
   }
 
-  if (!apiKey) {
-    return res.status(500).json({ error: 'DeepL API key not configured' });
-  }
-
   try {
-    const url = 'https://api-free.deepl.com/v1/translate';
+    const response = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|fi`
+    );
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `DeepL-Auth-Key ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        text: [text],
-        target_lang: 'FI'
-      })
-    });
-
-    const responseText = await response.text();
-    
-    if (!response.ok) {
-      console.error(`DeepL ${response.status}:`, responseText);
-      return res.status(response.status).json({ 
-        error: `DeepL error: ${responseText}`,
-        status: response.status 
-      });
-    }
-
-    const data = JSON.parse(responseText);
-    const finnish = data.translations?.[0]?.text || 'Translation failed';
+    const data = await response.json();
+    const finnish = data.responseData?.translatedText || 'Translation failed';
 
     res.status(200).json({
       english: text,
