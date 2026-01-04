@@ -42,7 +42,7 @@ Provide ONLY the Finnish translation at this level. For A1, use very simple word
               }]
             }],
             generationConfig: {
-              maxOutputTokens: 2048
+              maxOutputTokens: 8192
             }
           })
         }
