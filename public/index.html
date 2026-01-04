@@ -81,9 +81,11 @@ function FinnishMVP() {
 
       {step === 'welcome' && (
         <div className="step">
-          <h2>Ready to find your gaps?</h2>
+          <h2>Ready for Finnish?</h2>
           <button className="btn" onClick={createUser}>🚀 Start Diagnostic</button>
-        </div>
+          <button className="btn" style={{marginLeft:'15px'}} onClick={() =>
+	setStep('translate')}>📖 Translate Text</button>
+	</div>
       )}
 
       {step === 'diagnostic' && (
@@ -111,7 +113,18 @@ function FinnishMVP() {
           </button>
         </div>
       )}
-
+	{step === 'translate' && (
+  <div className="step">
+    <h2>📖 Translate Content</h2>
+    <textarea id="englishText" placeholder="Paste English text to translate..." rows="6" style={{width:'100%',padding:'20px',borderRadius:'12px',border:'2px solid #e5e7eb',fontSize:'16px',marginBottom:'20px'}}/>
+    <div style={{textAlign:'center'}}>
+      <button className="btn" onClick={translateToA1}>→ A1 Finnish</button>
+      <button className="btn" style={{marginLeft:'15px'}} onClick={translateToB1}>→ B1 Finnish</button>
+    </div>
+    <div id="translationResult" style={{marginTop:'30px',padding:'20px',background:'#f0f9ff',borderRadius:'12px',borderLeft:'4px solid #3b82f6'}}></div>
+  </div>
+)}
+ 
       {step === 'knowledge-map' && knowledgeMap && (
         <div className="step">
           <h2>📊 Your Knowledge Map</h2>
