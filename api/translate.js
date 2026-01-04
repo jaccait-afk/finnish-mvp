@@ -16,10 +16,10 @@ export default async function handler(req, res) {
 
   // Try models in order
   const models = [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-pro',
-    'gemini-pro-vision'
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash-lite-001'
   ];
 
   for (const model of models) {
@@ -61,7 +61,7 @@ Provide ONLY the Finnish translation at this level. For A1, use very simple word
         });
       }
     } catch (e) {
-      console.log(`Model ${model} failed, trying next...`, e.message);
+      console.error(`Model ${model} failed:`, e.message);
       continue;
     }
   }
