@@ -15,11 +15,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if free or pro tier
-    const isFree = apiKey.includes(':fx');
-    const url = isFree 
-      ? 'https://api-free.deepl.com/v1/translate'
-      : 'https://api.deepl.com/v1/translate';
+    const url = 'https://api-free.deepl.com/v1/translate';
 
     const response = await fetch(url, {
       method: 'POST',
@@ -33,13 +29,17 @@ export default async function handler(req, res) {
       })
     });
 
+    const responseText = await response.text();
+    
     if (!response.ok) {
-      const error = await response.text();
-      console.error('DeepL error:', error);
-      return res.status(response.status).json({ error: `DeepL error: ${error}` });
+      console.error(`DeepL ${response.status}:`, responseText);
+      return res.status(response.status).json({ 
+        error: `DeepL error: ${responseText}`,
+        status: response.status 
+      });
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     const finnish = data.translations?.[0]?.text || 'Translation failed';
 
     res.status(200).json({
