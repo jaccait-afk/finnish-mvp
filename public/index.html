@@ -36,20 +36,49 @@
       color: #333;
       font-size: 14px;
     }
-    textarea {
+    input[type="text"], textarea {
       width: 100%;
       padding: 10px;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 16px;
-      min-height: 120px;
       font-family: inherit;
       box-sizing: border-box;
     }
-    textarea:focus {
+    input[type="text"]:focus, textarea:focus {
       outline: none;
       border-color: #007bff;
       box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+    textarea {
+      min-height: 120px;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .input-group input {
+      flex: 1;
+    }
+    .input-group button {
+      padding: 10px 16px;
+      background: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0;
+      transition: background 150ms ease;
+    }
+    .input-group button:hover {
+      background: #5a6268;
+    }
+    .input-group button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
     select {
       width: 100%;
@@ -65,7 +94,7 @@
       border-color: #007bff;
       box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
     }
-    button {
+    button#translateBtn {
       width: 100%;
       padding: 12px;
       background: #007bff;
@@ -78,10 +107,10 @@
       margin-top: 20px;
       transition: background 150ms ease;
     }
-    button:hover { 
+    button#translateBtn:hover { 
       background: #0056b3;
     }
-    button:disabled {
+    button#translateBtn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
@@ -161,6 +190,12 @@
     <h1>🇫🇮 Finnish Translator</h1>
     <p class="subtitle">Translate and learn at your CEFR level</p>
     
+    <label for="urlInput">Fetch from URL (optional)</label>
+    <div class="input-group">
+      <input type="text" id="urlInput" placeholder="https://example.com/article">
+      <button id="fetchBtn" onclick="fetchFromUrl()">Fetch</button>
+    </div>
+    
     <label for="textInput">Text to translate</label>
     <textarea id="textInput" placeholder="Paste English text here..."></textarea>
     
@@ -194,6 +229,42 @@
   </div>
 
   <script>
+    async function fetchFromUrl() {
+      const url = document.getElementById('urlInput').value.trim();
+      const textInput = document.getElementById('textInput');
+      const errorDiv = document.getElementById('error');
+      const fetchBtn = document.getElementById('fetchBtn');
+      
+      errorDiv.classList.remove('show');
+      
+      if (!url) {
+        errorDiv.textContent = 'Please enter a URL.';
+        errorDiv.classList.add('show');
+        return;
+      }
+      
+      fetchBtn.disabled = true;
+      fetchBtn.textContent = 'Fetching...';
+      
+      try {
+        const response = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch content');
+        }
+        
+        textInput.value = data.content;
+        errorDiv.classList.remove('show');
+      } catch (err) {
+        errorDiv.textContent = err.message || 'Error fetching URL. Please try again.';
+        errorDiv.classList.add('show');
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch';
+      }
+    }
+    
     async function translate() {
       const text = document.getElementById('textInput').value.trim();
       const level = document.getElementById('levelSelect').value;
