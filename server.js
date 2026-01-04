@@ -35,13 +35,28 @@ B1: { finnish: 'Käyn kaupungissa ostoksilla.', pronunciation: 'KAH-oon KAH-poon
 app.get('/api/fetch-content', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'No URL provided' });
+  
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Failed to fetch: ${response.statusText}` });
+    }
+    
     const text = await response.text();
-    const plainText = text.replace(/<[^>]*>/g, '').replace(/\n\n+/g, '\n').trim().substring(0, 2000);
-    res.json({ content: plainText });
+    const plainText = text
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\n\n+/g, '\n')
+      .trim()
+      .substring(0, 3000);
+    
+    res.json({ content: plainText || 'No content found' });
   } catch (e) {
-    res.status(500).json({ error: 'Failed to fetch URL' });
+    console.error('Fetch error:', e.message);
+    res.status(500).json({ error: `Server error: ${e.message}` });
   }
 });
 
