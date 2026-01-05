@@ -22,31 +22,38 @@ export default async function handler(req, res) {
 
   console.log("API Key check passed, key length:", process.env.GOOGLE_API_KEY?.length);
 
-  try {
-    const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+  let translated = null;
+  let lastError = null;
 
-    const languageMap = {
-      Finnish: "Finnish",
-      English: "English",
-      Spanish: "Spanish",
-      French: "French"
-    };
+  // Try each model until one works
+  for (const modelName of models) {
+    try {
+      console.log(`Attempting translation with ${modelName}...`);
+      const model = client.getGenerativeModel({ model: modelName });
 
-    const targetLang = languageMap[targetLanguage] || "Finnish";
+      const languageMap = {
+        Finnish: "Finnish",
+        English: "English",
+        Spanish: "Spanish",
+        French: "French"
+      };
 
-    const levelMap = {
-      A1: "absolute beginner (A1)",
-      A2: "elementary (A2)",
-      B1: "intermediate (B1)",
-      B2: "upper intermediate (B2)",
-      C1: "advanced (C1)",
-      C2: "mastery level (C2)",
-      Simplified: "simplified version for easy understanding"
-    };
+      const targetLang = languageMap[targetLanguage] || "Finnish";
 
-    const levelDesc = levelMap[level] || "intermediate (B1)";
+      const levelMap = {
+        A1: "absolute beginner (A1)",
+        A2: "elementary (A2)",
+        B1: "intermediate (B1)",
+        B2: "upper intermediate (B2)",
+        C1: "advanced (C1)",
+        C2: "mastery level (C2)",
+        Simplified: "simplified version for easy understanding"
+      };
 
-    const prompt = `Translate the following text to ${targetLang} at the ${levelDesc} CEFR level. 
+      const levelDesc = levelMap[level] || "intermediate (B1)";
+
+      const prompt = `Translate the following text to ${targetLang} at the ${levelDesc} CEFR level. 
 
 The translation should:
 - Use vocabulary appropriate for a ${levelDesc} learner
@@ -60,21 +67,29 @@ ${text}
 
 Provide ONLY the translation, nothing else.`;
 
-    console.log("Calling Gemini API...");
-    const result = await model.generateContent(prompt);
-    console.log("Gemini response received");
-    
-    const translated = result.response.text().trim();
+      const result = await model.generateContent(prompt);
+      translated = result.response.text().trim();
+      console.log(`Success with ${modelName}`);
+      break;
 
-    res.status(200).json({
-      translated,
-      targetLanguage: targetLang,
-      level
-    });
-  } catch (error) {
-    console.error("Translation error:", error.message);
-    console.error("Full error:", error);
-    res.status(500).json({ error: `Translation failed: ${error.message}` });
+    } catch (error) {
+      console.error(`Failed with ${modelName}:`, error.message);
+      lastError = error;
+      continue;
+    }
   }
+
+  if (!translated) {
+    console.error("All models failed. Last error:", lastError?.message);
+    return res.status(500).json({ 
+      error: `Translation failed: ${lastError?.message || "All models exhausted"}` 
+    });
+  }
+
+  res.status(200).json({
+    translated,
+    targetLanguage: languageMap[targetLanguage] || "Finnish",
+    level
+  });
 }
 
