@@ -20,6 +20,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
+console.log("API Key check passed, key length:",
+process.env.GOOGLE_API_KEY?.length);
+
   try {
     const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
 
