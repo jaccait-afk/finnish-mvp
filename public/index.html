@@ -29,6 +29,7 @@
     .fetch-info.show { display: block; }
     .staging-info { display: none; margin-top: 10px; padding: 12px; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 6px; font-size: 13px; color: #333; }
     .staging-info.show { display: block; }
+    .debug-info { margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; font-size: 12px; color: #333; }
     input, select, textarea { width: 100%; padding: 12px; margin: 10px 0 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
     textarea { font-family: monospace; resize: vertical; min-height: 120px; }
@@ -75,9 +76,11 @@ function FinnishMVP() {
     setLoading(true);
     setFetchInfo(null);
     setStagingInfo(null);
+    setFullContent(null);
     try {
       const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
       const data = await res.json();
+      console.log('Fetch response:', data);
       if (data.content) {
         // Store full content for staged reading
         setFullContent(data.content);
@@ -138,8 +141,6 @@ function FinnishMVP() {
   }
 
   const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
-  const hasNextChunk = totalChunks > 1 && currentChunk < totalChunks - 1;
-  const hasPrevChunk = totalChunks > 1 && currentChunk > 0;
 
   return (
     <div className="container">
@@ -178,6 +179,12 @@ function FinnishMVP() {
           </div>
         )}
 
+        {fullContent && (
+          <div className="debug-info">
+            fullContent length: {fullContent.length}, totalChunks: {totalChunks}, currentChunk: {currentChunk}
+          </div>
+        )}
+
         {stagingInfo && (
           <div className="staging-info show">
             {stagingInfo}
@@ -207,8 +214,8 @@ function FinnishMVP() {
 
         {fullContent && totalChunks > 1 && (
           <div className="button-row">
-            <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || !hasPrevChunk} style={{opacity: hasPrevChunk ? 1 : 0.5}}>← Previous</button>
-            <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || !hasNextChunk} style={{opacity: hasNextChunk ? 1 : 0.5}}>Next →</button>
+            <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Previous</button>
+            <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
           </div>
         )}
         
