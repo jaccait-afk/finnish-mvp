@@ -50,10 +50,15 @@ app.get('/api/fetch-content', async (req, res) => {
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<[^>]*>/g, '')
       .replace(/\n\n+/g, '\n')
-      .trim()
-      .substring(0, 3000);
+      .trim();
     
-    res.json({ content: plainText || 'No content found' });
+    console.log(`Fetched content length: ${plainText.length} characters`);
+    
+    res.json({ 
+      content: plainText.substring(0, 10000),
+      totalLength: plainText.length,
+      truncated: plainText.length > 10000
+    });
   } catch (e) {
     console.error('Fetch error:', e.message);
     res.status(500).json({ error: `Server error: ${e.message}` });
