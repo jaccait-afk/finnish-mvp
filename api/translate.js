@@ -9,8 +9,15 @@ export default async function handler(req, res) {
 
   const { text, level, targetLanguage = "Finnish" } = req.body;
 
+  console.log("Request received:", { text: text.substring(0, 50), level, targetLanguage });
+
   if (!text || !level) {
     return res.status(400).json({ error: "Missing text or level" });
+  }
+
+  if (!process.env.GOOGLE_API_KEY) {
+    console.error("GOOGLE_API_KEY is not set");
+    return res.status(500).json({ error: "API key not configured" });
   }
 
   try {
@@ -51,7 +58,10 @@ ${text}
 
 Provide ONLY the translation, nothing else.`;
 
+    console.log("Calling Gemini API...");
     const result = await model.generateContent(prompt);
+    console.log("Gemini response received");
+    
     const translated = result.response.text().trim();
 
     res.status(200).json({
@@ -60,7 +70,8 @@ Provide ONLY the translation, nothing else.`;
       level
     });
   } catch (error) {
-    console.error("Translation error:", error);
+    console.error("Translation error:", error.message);
+    console.error("Full error:", error);
     res.status(500).json({ error: `Translation failed: ${error.message}` });
   }
 }
