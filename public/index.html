@@ -87,14 +87,13 @@ function FinnishMVP() {
         setTranslateText(data.content.substring(0, CHUNK_SIZE));
         
         // Show info
-        const total = data.totalLength || 0;
         const displayed = data.content.length;
         setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
         
         // Show staging info if content is longer than chunk
         if (data.content.length > CHUNK_SIZE) {
           const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
-          setStagingInfo(`Showing chunk 1 of ${totalChunks}. Use "Next Section" to read more.`);
+          setStagingInfo(`Showing chunk 1 of ${totalChunks}. Use "Next" to read more.`);
         }
       } else {
         alert('Could not fetch content from URL');
@@ -139,8 +138,8 @@ function FinnishMVP() {
   }
 
   const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
-  const hasNextChunk = fullContent && currentChunk < totalChunks - 1;
-  const hasPrevChunk = currentChunk > 0;
+  const hasNextChunk = totalChunks > 1 && currentChunk < totalChunks - 1;
+  const hasPrevChunk = totalChunks > 1 && currentChunk > 0;
 
   return (
     <div className="container">
@@ -206,14 +205,10 @@ function FinnishMVP() {
           <option value="Selkosuomi">Selkosuomi (Simplified Finnish)</option>
         </select>
 
-        {fullContent && (
+        {fullContent && totalChunks > 1 && (
           <div className="button-row">
-            {hasPrevChunk && (
-              <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading}>← Previous</button>
-            )}
-            {hasNextChunk && (
-              <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading}>Next →</button>
-            )}
+            <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || !hasPrevChunk} style={{opacity: hasPrevChunk ? 1 : 0.5}}>← Previous</button>
+            <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || !hasNextChunk} style={{opacity: hasNextChunk ? 1 : 0.5}}>Next →</button>
           </div>
         )}
         
