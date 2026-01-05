@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Finnish MVP</title>
+  <title>Language Translator</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -42,8 +42,9 @@
 <script type="text/babel">
 const { useState } = React;
 
-function FinnishMVP() {
+function LanguageTranslator() {
   const [translateText, setTranslateText] = useState('I go to the city.');
+  const [targetLanguage, setTargetLanguage] = useState('Finnish');
   const [translateLevel, setTranslateLevel] = useState('A1');
   const [translateResult, setTranslateResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -53,13 +54,19 @@ function FinnishMVP() {
   const [stagingInfo, setStagingInfo] = useState(null);
   const CHUNK_SIZE = 3000;
 
+  const languages = ['Finnish', 'English', 'Spanish', 'French'];
+
   async function handleTranslate() {
     setLoading(true);
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: translateText, level: translateLevel })
+        body: JSON.stringify({ 
+          text: translateText, 
+          level: translateLevel,
+          targetLanguage: targetLanguage
+        })
       });
       const data = await res.json();
       setTranslateResult(data);
@@ -81,21 +88,16 @@ function FinnishMVP() {
       const data = await res.json();
       console.log('Fetch response length:', data.content.length);
       if (data.content) {
-        // Store cleaned content for staged reading
-        const cleanedContent = data.content;
-        setFullContent(cleanedContent);
+        setFullContent(data.content);
         setCurrentChunk(0);
         
-        // Set first chunk
-        setTranslateText(cleanedContent.substring(0, CHUNK_SIZE));
+        setTranslateText(data.content.substring(0, CHUNK_SIZE));
         
-        // Show info
-        const displayed = cleanedContent.length;
+        const displayed = data.content.length;
         setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
         
-        // Show staging info if content is longer than chunk
-        if (cleanedContent.length > CHUNK_SIZE) {
-          const totalChunks = Math.ceil(cleanedContent.length / CHUNK_SIZE);
+        if (data.content.length > CHUNK_SIZE) {
+          const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
           setStagingInfo(`Showing chunk 1 of ${totalChunks}. Use "Next" to read more.`);
         }
       } else {
@@ -144,11 +146,11 @@ function FinnishMVP() {
 
   return (
     <div className="container">
-      <h1>🇫🇮 Finnish Translator</h1>
+      <h1>🌍 Language Translator</h1>
 
       <div className="step">
-        <h2>📚 Translate to Your Level</h2>
-        <p style={{marginBottom: '20px', color: '#666'}}>Translate text or web articles to Finnish at your CEFR level</p>
+        <h2>📚 Translate Text to Your Level</h2>
+        <p style={{marginBottom: '20px', color: '#666'}}>Translate text or web articles to your chosen language at your CEFR level</p>
         
         <div>
           <label>📎 Paste Web Address (URL):</label>
@@ -190,12 +192,19 @@ function FinnishMVP() {
           <textarea 
             value={translateText}
             onChange={(e) => setTranslateText(e.target.value)}
-            placeholder="Paste English text here..."
+            placeholder="Paste text here (any language)..."
             disabled={loading}
           />
         </div>
         
-        <label>Select your Finnish level:</label>
+        <label>🎯 Target Language:</label>
+        <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
+          {languages.map(lang => (
+            <option key={lang} value={lang}>{lang}</option>
+          ))}
+        </select>
+
+        <label>📊 Your Level:</label>
         <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
           <option value="A1">A1 (Beginner)</option>
           <option value="A2">A2 (Elementary)</option>
@@ -203,7 +212,7 @@ function FinnishMVP() {
           <option value="B2">B2 (Upper Intermediate)</option>
           <option value="C1">C1 (Advanced)</option>
           <option value="C2">C2 (Mastery)</option>
-          <option value="Selkosuomi">Selkosuomi (Simplified Finnish)</option>
+          <option value="Simplified">Simplified</option>
         </select>
 
         {fullContent && totalChunks > 1 && (
@@ -219,13 +228,10 @@ function FinnishMVP() {
 
         {translateResult && (
           <div className="result-box">
-            <p><strong>✅ Translated to {translateResult.level}:</strong></p>
+            <p><strong>✅ Translated to {translateResult.targetLanguage} ({translateResult.level}):</strong></p>
             <div className="result-content">
-              {translateResult.finnish}
+              {translateResult.translated}
             </div>
-            {translateResult.pronunciation && (
-              <p style={{marginTop: '15px', fontSize: '0.9em', color: '#666'}}><strong>🔊 Pronunciation:</strong> {translateResult.pronunciation}</p>
-            )}
           </div>
         )}
       </div>
@@ -233,7 +239,7 @@ function FinnishMVP() {
   );
 }
 
-ReactDOM.render(<FinnishMVP />, document.getElementById('root'));
+ReactDOM.render(<LanguageTranslator />, document.getElementById('root'));
 </script>
 </body>
 </html>
