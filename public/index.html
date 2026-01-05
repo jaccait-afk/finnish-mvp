@@ -7,45 +7,43 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     * { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    html, body { height: 100%; }
-    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
-    #root { display: flex; flex-direction: column; min-height: 100vh; }
-    .container { max-width: 1400px; width: 100%; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
-    h1 { font-size: 2.5em; color: #667eea; text-align: center; margin-bottom: 20px; }
-    h2 { font-size: 1.8em; color: #333; margin-bottom: 15px; }
-    h3 { font-size: 1.3em; color: #333; margin-bottom: 10px; margin-top: 0; }
-    .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 16px 32px; border-radius: 12px; border: none; cursor: pointer; font-size: 16px; font-weight: 600; margin: 10px 5px; transition: all 0.2s; }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(59,130,246,0.4); }
+    html, body, #root { height: 100%; }
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .app { display: flex; flex-direction: column; height: 100vh; }
+    .controls { background: white; padding: 20px 40px; border-radius: 20px 20px 0 0; flex: 0 0 auto; max-height: 35%; overflow-y: auto; }
+    .controls h1 { font-size: 2em; color: #667eea; text-align: center; margin-bottom: 10px; }
+    .controls h2 { font-size: 1.2em; color: #333; margin-bottom: 10px; }
+    .controls p { color: #666; margin-bottom: 10px; font-size: 0.9em; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-weight: bold; font-size: 0.9em; margin-bottom: 5px; color: #333; }
+    .form-group input, .form-group select, .form-group textarea { padding: 8px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #667eea; }
+    .form-group textarea { grid-column: 1 / -1; min-height: 80px; resize: vertical; font-family: monospace; }
+    .input-group { display: flex; gap: 10px; }
+    .input-group input { flex: 1; padding: 8px; }
+    .button-row { display: flex; gap: 10px; }
+    .button-row button { flex: 1; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(59,130,246,0.3); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-secondary { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-    .btn-secondary:hover { box-shadow: 0 15px 30px rgba(139,92,246,0.4); }
-    .btn-small { padding: 8px 16px; font-size: 14px; margin: 5px 2px; }
-    .step { background: #f8fafc; border-radius: 16px; padding: 30px; margin: 20px 0; }
-    .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-    .input-group input { flex: 1; }
-    .input-group button { flex: 0 0 auto; margin: 10px 0 20px 0; padding: 12px 20px; }
-    .fetch-info { display: none; margin-top: 10px; padding: 12px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 6px; font-size: 13px; color: #333; }
-    .fetch-info.show { display: block; }
-    .staging-info { display: none; margin-top: 10px; padding: 12px; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 6px; font-size: 13px; color: #333; }
-    .staging-info.show { display: block; }
-    input, select, textarea { width: 100%; padding: 12px; margin: 10px 0 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
-    input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
-    textarea { font-family: monospace; resize: vertical; min-height: 100px; }
-    label { display: block; margin-bottom: 10px; font-weight: bold; color: #333; }
-    .button-row { display: flex; gap: 10px; margin-bottom: 20px; }
-    .button-row button { flex: 1; margin: 0; }
-    .controls-section { background: #f8fafc; border-radius: 16px; padding: 30px; margin: 20px 0; max-height: 60vh; overflow-y: auto; }
-    .parallel-view { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
-    .parallel-column { background: #f9f9f9; padding: 25px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; width: 100%; }
-    .parallel-column h3 { color: #667eea; margin-bottom: 15px; }
-    .parallel-text { background: white; padding: 20px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; cursor: text; border: 1px solid #e5e7eb; position: relative; }
+    .btn-secondary:hover { box-shadow: 0 10px 20px rgba(139,92,246,0.3); }
+    .btn-small { padding: 6px 12px; font-size: 12px; }
+    .info-box { display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #333; }
+    .info-box.show { display: block; }
+    .translations { background: white; flex: 1 1 auto; padding: 40px; border-radius: 0 0 20px 20px; overflow-y: auto; }
+    .parallel-view { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    .text-column { background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+    .text-column h3 { color: #667eea; margin-bottom: 15px; margin-top: 0; font-size: 1.1em; }
+    .text-box { background: white; padding: 15px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; border: 1px solid #e5e7eb; position: relative; min-height: 300px; }
     .level-buttons { display: flex; gap: 10px; margin-top: 15px; }
-    .level-buttons button { flex: 1; margin: 0; }
-    .selection-popup { position: fixed; background: white; border: 1px solid #667eea; border-radius: 8px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: none; }
+    .level-buttons button { flex: 1; }
+    .selection-popup { position: fixed; background: white; border: 1px solid #667eea; border-radius: 6px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: none; }
     .selection-popup.show { display: block; }
-    .selection-popup button { padding: 8px 12px; font-size: 12px; margin: 0; }
-    .translate-tooltip { position: absolute; background: #333; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 1001; white-space: nowrap; pointer-events: none; }
-    .translate-tooltip.show { display: block; }
+    .selection-popup button { padding: 6px 10px; font-size: 12px; }
+    .tooltip { position: fixed; background: #333; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 1001; white-space: nowrap; pointer-events: none; }
+    .tooltip.show { display: block; }
   </style>
 </head>
 <body>
@@ -100,19 +98,15 @@ function LanguageTranslator() {
     try {
       const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
       const data = await res.json();
-      console.log('Fetch response length:', data.content.length);
       if (data.content) {
         setFullContent(data.content);
         setCurrentChunk(0);
-        
         setTranslateText(data.content.substring(0, CHUNK_SIZE));
-        
         const displayed = data.content.length;
         setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
-        
         if (data.content.length > CHUNK_SIZE) {
           const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
-          setStagingInfo(`Showing chunk 1 of ${totalChunks}. Use "Next" to read more.`);
+          setStagingInfo(`Chunk 1 of ${totalChunks}`);
         }
       } else {
         alert('Could not fetch content from URL');
@@ -130,14 +124,12 @@ function LanguageTranslator() {
     const start = nextChunk * CHUNK_SIZE;
     const end = start + CHUNK_SIZE;
     const nextText = fullContent.substring(start, end);
-    
     if (nextText) {
       setTranslateText(nextText);
       setCurrentChunk(nextChunk);
       setTranslateResult(null);
-      
       const totalChunks = Math.ceil(fullContent.length / CHUNK_SIZE);
-      setStagingInfo(`Showing chunk ${nextChunk + 1} of ${totalChunks}`);
+      setStagingInfo(`Chunk ${nextChunk + 1} of ${totalChunks}`);
     }
   }
 
@@ -147,26 +139,28 @@ function LanguageTranslator() {
     const start = prevChunk * CHUNK_SIZE;
     const end = start + CHUNK_SIZE;
     const prevText = fullContent.substring(start, end);
-    
     setTranslateText(prevText);
     setCurrentChunk(prevChunk);
     setTranslateResult(null);
-    
     const totalChunks = Math.ceil(fullContent.length / CHUNK_SIZE);
-    setStagingInfo(`Showing chunk ${prevChunk + 1} of ${totalChunks}`);
+    setStagingInfo(`Chunk ${prevChunk + 1} of ${totalChunks}`);
   }
 
   function handleTextSelection(e) {
     const selectedText = window.getSelection().toString().trim();
     if (selectedText.length > 0) {
-      const range = window.getSelection().getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      setSelectionPopup({
-        show: true,
-        x: rect.left + window.scrollX,
-        y: rect.top + window.scrollY - 50,
-        text: selectedText
-      });
+      try {
+        const range = window.getSelection().getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectionPopup({
+          show: true,
+          x: rect.left + window.scrollX,
+          y: rect.top + window.scrollY - 40,
+          text: selectedText
+        });
+      } catch (e) {
+        console.error('Selection error:', e);
+      }
     }
   }
 
@@ -185,18 +179,23 @@ function LanguageTranslator() {
       });
       const data = await res.json();
       
-      const range = window.getSelection().getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      try {
+        const range = window.getSelection().getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        setTooltip({
+          show: true,
+          x: rect.left + window.scrollX,
+          y: rect.bottom + window.scrollY + 5,
+          text: data.translation || 'Translation failed'
+        });
+      } catch (e) {
+        console.error('Tooltip position error:', e);
+      }
       
-      setTooltip({
-        show: true,
-        x: rect.left + window.scrollX,
-        y: rect.bottom + window.scrollY + 5,
-        text: data.translation || 'Translation failed'
-      });
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
       
-      setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 5000);
+      setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 4000);
     } catch (e) {
       console.error('Error:', e);
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
@@ -219,96 +218,82 @@ function LanguageTranslator() {
   const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <div className="container" style={{ flex: '0 0 auto' }}>
+    <div className="app">
+      <div className="controls">
         <h1>🌍 Language Translator</h1>
+        <h2>Translate to Your Level</h2>
 
-        <div className="controls-section">
-          <h2>📚 Translate Text to Your Level</h2>
-          <p style={{marginBottom: '20px', color: '#666'}}>Translate text or web articles to your chosen language at your CEFR level</p>
-          
-          <div>
-            <label>📎 Paste Web Address (URL):</label>
-            <div className="input-group">
-              <input 
-                type="text"
-                placeholder="https://example.com/article"
-                disabled={loading}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') fetchWebContent(e.target.value);
-                }}
-                onChange={(e) => {
-                  if (e.target.value.trim().length > 5) {
-                    const timer = setTimeout(() => {
-                      fetchWebContent(e.target.value);
-                    }, 1000);
-                    return () => clearTimeout(timer);
-                  }
-                }}
-              />
-            </div>
-            <p style={{fontSize: '0.85em', color: '#999', marginTop: '-15px'}}>Press Enter or wait 1 second to fetch content</p>
-          </div>
-
-          {fetchInfo && (
-            <div className="fetch-info show">
-              {fetchInfo}
-            </div>
-          )}
-
-          {stagingInfo && (
-            <div className="staging-info show">
-              {stagingInfo}
-            </div>
-          )}
-
-          <div style={{marginBottom: '20px'}}>
-            <label>✏️ Or paste text directly:</label>
-            <textarea 
-              value={translateText}
-              onChange={(e) => setTranslateText(e.target.value)}
-              placeholder="Paste text here (any language)..."
+        <div className="form-group" style={{ marginBottom: '10px' }}>
+          <label>📎 Paste Web URL:</label>
+          <div className="input-group">
+            <input 
+              type="text"
+              placeholder="https://example.com/article"
               disabled={loading}
+              onKeyPress={(e) => { if (e.key === 'Enter') fetchWebContent(e.target.value); }}
+              onChange={(e) => {
+                if (e.target.value.trim().length > 5) {
+                  const timer = setTimeout(() => { fetchWebContent(e.target.value); }, 1000);
+                  return () => clearTimeout(timer);
+                }
+              }}
             />
           </div>
-          
-          <label>🎯 Target Language:</label>
-          <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
-            {languages.map(lang => (
-              <option key={lang} value={lang}>{lang}</option>
-            ))}
-          </select>
-
-          <label>📊 Your Level:</label>
-          <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
-            <option value="A1">A1 (Beginner)</option>
-            <option value="A2">A2 (Elementary)</option>
-            <option value="B1">B1 (Intermediate)</option>
-            <option value="B2">B2 (Upper Intermediate)</option>
-            <option value="C1">C1 (Advanced)</option>
-            <option value="C2">C2 (Mastery)</option>
-            <option value="Simplified">Simplified</option>
-          </select>
-
-          {fullContent && totalChunks > 1 && (
-            <div className="button-row">
-              <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Previous</button>
-              <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
-            </div>
-          )}
-          
-          <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
-            {loading ? '⏳ Processing...' : '🔄 Translate'}
-          </button>
         </div>
+
+        {fetchInfo && <div className="info-box show">{fetchInfo}</div>}
+        {stagingInfo && <div className="info-box show">{stagingInfo}</div>}
+
+        <div className="form-group">
+          <label>✏️ Text:</label>
+          <textarea 
+            value={translateText}
+            onChange={(e) => setTranslateText(e.target.value)}
+            onMouseUp={handleTextSelection}
+            placeholder="Paste text here..."
+            disabled={loading}
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>🎯 Language:</label>
+            <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
+              {languages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>📊 Level:</label>
+            <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
+              <option value="A1">A1 (Beginner)</option>
+              <option value="A2">A2 (Elementary)</option>
+              <option value="B1">B1 (Intermediate)</option>
+              <option value="B2">B2 (Upper Intermediate)</option>
+              <option value="C1">C1 (Advanced)</option>
+              <option value="C2">C2 (Mastery)</option>
+              <option value="Simplified">Simplified</option>
+            </select>
+          </div>
+        </div>
+
+        {fullContent && totalChunks > 1 && (
+          <div className="button-row" style={{ marginBottom: '10px' }}>
+            <button className="btn btn-secondary btn-small" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Prev</button>
+            <button className="btn btn-secondary btn-small" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
+          </div>
+        )}
+        
+        <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
+          {loading ? '⏳ Translating...' : '🔄 Translate'}
+        </button>
       </div>
 
-      <div className="container" style={{ flex: '1 1 auto', overflowY: 'auto' }}>
+      <div className="translations">
         {translateResult && (
           <div className="parallel-view">
-            <div className="parallel-column">
+            <div className="text-column">
               <h3>✨ {translateResult.targetLanguage} ({translateResult.level})</h3>
-              <div className="parallel-text" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
+              <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
                 {translateResult.translated}
               </div>
               <div className="level-buttons">
@@ -320,9 +305,9 @@ function LanguageTranslator() {
                 </button>
               </div>
             </div>
-            <div className="parallel-column">
+            <div className="text-column">
               <h3>📖 Original</h3>
-              <div className="parallel-text" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
+              <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
                 {translateText}
               </div>
             </div>
@@ -331,10 +316,7 @@ function LanguageTranslator() {
       </div>
 
       {selectionPopup.show && (
-        <div 
-          className="selection-popup show" 
-          style={{ left: `${selectionPopup.x}px`, top: `${selectionPopup.y}px` }}
-        >
+        <div className="selection-popup show" style={{ left: `${selectionPopup.x}px`, top: `${selectionPopup.y}px` }}>
           <button 
             className="btn btn-secondary btn-small" 
             onClick={handleSelectToTranslate}
@@ -346,10 +328,7 @@ function LanguageTranslator() {
       )}
 
       {tooltip.show && (
-        <div 
-          className="translate-tooltip show" 
-          style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}
-        >
+        <div className="tooltip show" style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}>
           {tooltip.text}
         </div>
       )}
