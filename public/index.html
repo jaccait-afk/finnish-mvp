@@ -29,7 +29,6 @@
     .fetch-info.show { display: block; }
     .staging-info { display: none; margin-top: 10px; padding: 12px; background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 6px; font-size: 13px; color: #333; }
     .staging-info.show { display: block; }
-    .debug-info { margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 6px; font-size: 12px; color: #333; }
     input, select, textarea { width: 100%; padding: 12px; margin: 10px 0 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
     textarea { font-family: monospace; resize: vertical; min-height: 120px; }
@@ -53,6 +52,12 @@ function FinnishMVP() {
   const [currentChunk, setCurrentChunk] = useState(0);
   const [stagingInfo, setStagingInfo] = useState(null);
   const CHUNK_SIZE = 3000;
+
+  function stripHtml(html) {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  }
 
   async function handleTranslate() {
     setLoading(true);
@@ -80,22 +85,23 @@ function FinnishMVP() {
     try {
       const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
       const data = await res.json();
-      console.log('Fetch response:', data);
+      console.log('Fetch response length:', data.content.length);
       if (data.content) {
-        // Store full content for staged reading
-        setFullContent(data.content);
+        // Store cleaned content for staged reading
+        const cleanedContent = stripHtml(data.content);
+        setFullContent(cleanedContent);
         setCurrentChunk(0);
         
         // Set first chunk
-        setTranslateText(data.content.substring(0, CHUNK_SIZE));
+        setTranslateText(cleanedContent.substring(0, CHUNK_SIZE));
         
         // Show info
-        const displayed = data.content.length;
+        const displayed = cleanedContent.length;
         setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
         
         // Show staging info if content is longer than chunk
-        if (data.content.length > CHUNK_SIZE) {
-          const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
+        if (cleanedContent.length > CHUNK_SIZE) {
+          const totalChunks = Math.ceil(cleanedContent.length / CHUNK_SIZE);
           setStagingInfo(`Showing chunk 1 of ${totalChunks}. Use "Next" to read more.`);
         }
       } else {
@@ -176,12 +182,6 @@ function FinnishMVP() {
         {fetchInfo && (
           <div className="fetch-info show">
             {fetchInfo}
-          </div>
-        )}
-
-        {fullContent && (
-          <div className="debug-info">
-            fullContent length: {fullContent.length}, totalChunks: {totalChunks}, currentChunk: {currentChunk}
           </div>
         )}
 
