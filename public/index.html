@@ -33,7 +33,7 @@
     input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
     textarea { font-family: monospace; resize: vertical; min-height: 120px; }
     label { display: block; margin-bottom: 10px; font-weight: bold; color: #333; }
-    .button-row { display: flex; gap: 10px; }
+    .button-row { display: flex; gap: 10px; margin-bottom: 20px; }
     .button-row button { flex: 1; margin: 0; }
   </style>
 </head>
@@ -138,6 +138,10 @@ function FinnishMVP() {
     setStagingInfo(`Showing chunk ${prevChunk + 1} of ${totalChunks}`);
   }
 
+  const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
+  const hasNextChunk = fullContent && currentChunk < totalChunks - 1;
+  const hasPrevChunk = currentChunk > 0;
+
   return (
     <div className="container">
       <h1>🇫🇮 Finnish Translator</h1>
@@ -204,8 +208,12 @@ function FinnishMVP() {
 
         {fullContent && (
           <div className="button-row">
-            <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={currentChunk === 0 || loading}>← Previous Section</button>
-            <button className="btn btn-secondary" onClick={loadNextChunk} disabled={currentChunk >= Math.ceil(fullContent.length / CHUNK_SIZE) - 1 || loading}>Next Section →</button>
+            {hasPrevChunk && (
+              <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading}>← Previous</button>
+            )}
+            {hasNextChunk && (
+              <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading}>Next →</button>
+            )}
           </div>
         )}
         
