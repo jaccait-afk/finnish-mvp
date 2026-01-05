@@ -7,8 +7,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     * { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    html, body { height: 100%; }
     body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
-    .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
+    #root { display: flex; flex-direction: column; min-height: 100vh; }
+    .container { max-width: 1400px; width: 100%; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
     h1 { font-size: 2.5em; color: #667eea; text-align: center; margin-bottom: 20px; }
     h2 { font-size: 1.8em; color: #333; margin-bottom: 15px; }
     h3 { font-size: 1.3em; color: #333; margin-bottom: 10px; margin-top: 0; }
@@ -28,22 +30,22 @@
     .staging-info.show { display: block; }
     input, select, textarea { width: 100%; padding: 12px; margin: 10px 0 20px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; }
-    textarea { font-family: monospace; resize: vertical; min-height: 120px; }
+    textarea { font-family: monospace; resize: vertical; min-height: 100px; }
     label { display: block; margin-bottom: 10px; font-weight: bold; color: #333; }
     .button-row { display: flex; gap: 10px; margin-bottom: 20px; }
     .button-row button { flex: 1; margin: 0; }
+    .controls-section { background: #f8fafc; border-radius: 16px; padding: 30px; margin: 20px 0; max-height: 60vh; overflow-y: auto; }
     .parallel-view { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
-    .parallel-column { background: #f9f9f9; padding: 25px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+    .parallel-column { background: #f9f9f9; padding: 25px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; width: 100%; }
     .parallel-column h3 { color: #667eea; margin-bottom: 15px; }
-    .parallel-text { background: white; padding: 20px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; cursor: text; border: 1px solid #e5e7eb; }
+    .parallel-text { background: white; padding: 20px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; cursor: text; border: 1px solid #e5e7eb; position: relative; }
     .level-buttons { display: flex; gap: 10px; margin-top: 15px; }
     .level-buttons button { flex: 1; margin: 0; }
     .selection-popup { position: fixed; background: white; border: 1px solid #667eea; border-radius: 8px; padding: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: none; }
     .selection-popup.show { display: block; }
     .selection-popup button { padding: 8px 12px; font-size: 12px; margin: 0; }
-    .translate-result-popup { position: fixed; background: white; border: 2px solid #667eea; border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1001; max-width: 300px; }
-    .translate-result-popup.show { display: block; }
-    .translate-result-popup.hidden { display: none; }
+    .translate-tooltip { position: absolute; background: #333; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 1001; white-space: nowrap; pointer-events: none; }
+    .translate-tooltip.show { display: block; }
   </style>
 </head>
 <body>
@@ -62,7 +64,7 @@ function LanguageTranslator() {
   const [currentChunk, setCurrentChunk] = useState(0);
   const [stagingInfo, setStagingInfo] = useState(null);
   const [selectionPopup, setSelectionPopup] = useState({ show: false, x: 0, y: 0, text: '' });
-  const [translationPopup, setTranslationPopup] = useState({ show: false, x: 0, y: 0, text: '', translation: '' });
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
   const [selectToTranslateLoading, setSelectToTranslateLoading] = useState(false);
   
   const CHUNK_SIZE = 3000;
@@ -178,7 +180,7 @@ function LanguageTranslator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: selectionPopup.text,
-          targetLanguage: targetLanguage
+          targetLanguage: 'English'
         })
       });
       const data = await res.json();
@@ -186,14 +188,15 @@ function LanguageTranslator() {
       const range = window.getSelection().getRangeAt(0);
       const rect = range.getBoundingClientRect();
       
-      setTranslationPopup({
+      setTooltip({
         show: true,
         x: rect.left + window.scrollX,
-        y: rect.bottom + window.scrollY + 10,
-        text: selectionPopup.text,
-        translation: data.translation || data.error || 'Translation failed'
+        y: rect.bottom + window.scrollY + 5,
+        text: data.translation || 'Translation failed'
       });
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
+      
+      setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 5000);
     } catch (e) {
       console.error('Error:', e);
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
@@ -216,89 +219,91 @@ function LanguageTranslator() {
   const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
 
   return (
-    <div className="container">
-      <h1>🌍 Language Translator</h1>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div className="container" style={{ flex: '0 0 auto' }}>
+        <h1>🌍 Language Translator</h1>
 
-      <div className="step">
-        <h2>📚 Translate Text to Your Level</h2>
-        <p style={{marginBottom: '20px', color: '#666'}}>Translate text or web articles to your chosen language at your CEFR level</p>
-        
-        <div>
-          <label>📎 Paste Web Address (URL):</label>
-          <div className="input-group">
-            <input 
-              type="text"
-              placeholder="https://example.com/article"
+        <div className="controls-section">
+          <h2>📚 Translate Text to Your Level</h2>
+          <p style={{marginBottom: '20px', color: '#666'}}>Translate text or web articles to your chosen language at your CEFR level</p>
+          
+          <div>
+            <label>📎 Paste Web Address (URL):</label>
+            <div className="input-group">
+              <input 
+                type="text"
+                placeholder="https://example.com/article"
+                disabled={loading}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') fetchWebContent(e.target.value);
+                }}
+                onChange={(e) => {
+                  if (e.target.value.trim().length > 5) {
+                    const timer = setTimeout(() => {
+                      fetchWebContent(e.target.value);
+                    }, 1000);
+                    return () => clearTimeout(timer);
+                  }
+                }}
+              />
+            </div>
+            <p style={{fontSize: '0.85em', color: '#999', marginTop: '-15px'}}>Press Enter or wait 1 second to fetch content</p>
+          </div>
+
+          {fetchInfo && (
+            <div className="fetch-info show">
+              {fetchInfo}
+            </div>
+          )}
+
+          {stagingInfo && (
+            <div className="staging-info show">
+              {stagingInfo}
+            </div>
+          )}
+
+          <div style={{marginBottom: '20px'}}>
+            <label>✏️ Or paste text directly:</label>
+            <textarea 
+              value={translateText}
+              onChange={(e) => setTranslateText(e.target.value)}
+              placeholder="Paste text here (any language)..."
               disabled={loading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') fetchWebContent(e.target.value);
-              }}
-              onChange={(e) => {
-                if (e.target.value.trim().length > 5) {
-                  const timer = setTimeout(() => {
-                    fetchWebContent(e.target.value);
-                  }, 1000);
-                  return () => clearTimeout(timer);
-                }
-              }}
             />
           </div>
-          <p style={{fontSize: '0.85em', color: '#999', marginTop: '-15px'}}>Press Enter or wait 1 second to fetch content</p>
+          
+          <label>🎯 Target Language:</label>
+          <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
+            {languages.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+
+          <label>📊 Your Level:</label>
+          <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
+            <option value="A1">A1 (Beginner)</option>
+            <option value="A2">A2 (Elementary)</option>
+            <option value="B1">B1 (Intermediate)</option>
+            <option value="B2">B2 (Upper Intermediate)</option>
+            <option value="C1">C1 (Advanced)</option>
+            <option value="C2">C2 (Mastery)</option>
+            <option value="Simplified">Simplified</option>
+          </select>
+
+          {fullContent && totalChunks > 1 && (
+            <div className="button-row">
+              <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Previous</button>
+              <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
+            </div>
+          )}
+          
+          <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
+            {loading ? '⏳ Processing...' : '🔄 Translate'}
+          </button>
         </div>
+      </div>
 
-        {fetchInfo && (
-          <div className="fetch-info show">
-            {fetchInfo}
-          </div>
-        )}
-
-        {stagingInfo && (
-          <div className="staging-info show">
-            {stagingInfo}
-          </div>
-        )}
-
-        <div style={{marginBottom: '20px'}}>
-          <label>✏️ Or paste text directly:</label>
-          <textarea 
-            value={translateText}
-            onChange={(e) => setTranslateText(e.target.value)}
-            onMouseUp={handleTextSelection}
-            onTouchEnd={handleTextSelection}
-            placeholder="Paste text here (any language)... Highlight text to translate just that selection."
-            disabled={loading}
-          />
-        </div>
-        
-        <label>🎯 Target Language:</label>
-        <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
-          {languages.map(lang => (
-            <option key={lang} value={lang}>{lang}</option>
-          ))}
-        </select>
-
-        <label>📊 Your Level:</label>
-        <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
-          <option value="A1">A1 (Beginner)</option>
-          <option value="A2">A2 (Elementary)</option>
-          <option value="B1">B1 (Intermediate)</option>
-          <option value="B2">B2 (Upper Intermediate)</option>
-          <option value="C1">C1 (Advanced)</option>
-          <option value="C2">C2 (Mastery)</option>
-          <option value="Simplified">Simplified</option>
-        </select>
-
-        {fullContent && totalChunks > 1 && (
-          <div className="button-row">
-            <button className="btn btn-secondary" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Previous</button>
-            <button className="btn btn-secondary" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
-          </div>
-        )}
-        
-        <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
-          {loading ? '⏳ Processing...' : '🔄 Translate'}
-        </button>
-
+      <div className="container" style={{ flex: '1 1 auto', overflowY: 'auto' }}>
         {translateResult && (
           <div className="parallel-view">
             <div className="parallel-column">
@@ -335,20 +340,17 @@ function LanguageTranslator() {
             onClick={handleSelectToTranslate}
             disabled={selectToTranslateLoading}
           >
-            {selectToTranslateLoading ? '⏳' : '🔤'} Translate
+            {selectToTranslateLoading ? '⏳' : '🔤'} English
           </button>
         </div>
       )}
 
-      {translationPopup.show && (
+      {tooltip.show && (
         <div 
-          className="translate-result-popup show" 
-          style={{ left: `${translationPopup.x}px`, top: `${translationPopup.y}px` }}
-          onClick={() => setTranslationPopup({ ...translationPopup, show: false })}
+          className="translate-tooltip show" 
+          style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}
         >
-          <p style={{fontSize: '0.9em', color: '#666', margin: '0 0 8px 0'}}>"{translationPopup.text}"</p>
-          <p style={{fontSize: '1.1em', fontWeight: 'bold', color: '#333', margin: '0'}}>{translationPopup.translation}</p>
-          <p style={{fontSize: '0.8em', color: '#999', margin: '8px 0 0 0'}}>Click to close</p>
+          {tooltip.text}
         </div>
       )}
     </div>
