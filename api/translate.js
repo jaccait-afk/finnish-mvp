@@ -22,12 +22,12 @@ export default async function handler(req, res) {
 
   console.log("API Key check passed, key length:", process.env.GOOGLE_API_KEY?.length);
 
-  const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+  const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-exp-01-21", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
   let translated = null;
   let lastError = null;
 
-  // Try each model until one works
-  for (const modelName of models) {
+  // Try Gemini models first
+  for (const modelName of geminiModels) {
     try {
       console.log(`Attempting translation with ${modelName}...`);
       const model = client.getGenerativeModel({ model: modelName });
@@ -79,12 +79,51 @@ Provide ONLY the translation, nothing else.`;
     }
   }
 
+  // Fallback to LibreTranslate if Gemini fails
   if (!translated) {
-    console.error("All models failed. Last error:", lastError?.message);
-    return res.status(500).json({ 
-      error: `Translation failed: ${lastError?.message || "All models exhausted"}` 
-    });
+    console.log("Gemini models exhausted. Trying LibreTranslate fallback...");
+    try {
+      const languageMap = {
+        Finnish: "fi",
+        English: "en",
+        Spanish: "es",
+        French: "fr"
+      };
+
+      const targetLangCode = languageMap[targetLanguage] || "fi";
+
+      const libreResponse = await fetch("https://api.libretranslate.de/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          q: text,
+          source: "auto",
+          target: targetLangCode
+        })
+      });
+
+      if (!libreResponse.ok) {
+        throw new Error(`LibreTranslate error: ${libreResponse.statusText}`);
+      }
+
+      const libreData = await libreResponse.json();
+      translated = libreData.translatedText;
+      console.log("Success with LibreTranslate fallback");
+
+    } catch (error) {
+      console.error("LibreTranslate fallback failed:", error.message);
+      return res.status(500).json({ 
+        error: `Translation failed: ${lastError?.message || error.message}` 
+      });
+    }
   }
+
+  const languageMap = {
+    Finnish: "Finnish",
+    English: "English",
+    Spanish: "Spanish",
+    French: "French"
+  };
 
   res.status(200).json({
     translated,
