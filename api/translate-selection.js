@@ -1,53 +1,329 @@
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Language Translator</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
+    h1 { font-size: 2.5em; color: #667eea; text-align: center; margin-bottom: 30px; }
+    h2 { font-size: 1.5em; color: #333; margin-bottom: 20px; }
+    h3 { font-size: 1.1em; color: #667eea; margin-bottom: 10px; margin-top: 0; }
+    .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+    .form-group label { font-weight: bold; font-size: 0.95em; margin-bottom: 6px; color: #333; }
+    .form-group input, .form-group select, .form-group textarea { padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #667eea; }
+    .form-group textarea { min-height: 100px; resize: vertical; font-family: monospace; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px; }
+    .input-group { display: flex; gap: 10px; }
+    .input-group input { flex: 1; }
+    .button-row { display: flex; gap: 10px; margin-bottom: 15px; }
+    .button-row button { flex: 1; margin: 0; }
+    .btn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(59,130,246,0.3); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .btn-secondary:hover { box-shadow: 0 10px 20px rgba(139,92,246,0.3); }
+    .btn-small { padding: 8px 16px; font-size: 12px; }
+    .info-box { display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #333; }
+    .info-box.show { display: block; }
+    .result-section { margin-top: 30px; }
+    .text-column { background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
+    .text-column h3 { color: #667eea; margin-bottom: 15px; }
+    .text-box { background: white; padding: 15px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; border: 1px solid #e5e7eb; position: relative; min-height: 300px; overflow-y: auto; }
+    .level-buttons { display: flex; gap: 10px; margin-top: 15px; }
+    .level-buttons button { flex: 1; }
+    .selection-popup { position: fixed; background: white; border: 1px solid #667eea; border-radius: 6px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: none; }
+    .selection-popup.show { display: block; }
+    .selection-popup button { padding: 6px 10px; font-size: 12px; margin: 0; }
+    .tooltip { position: fixed; background: #333; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; z-index: 1001; white-space: nowrap; pointer-events: none; }
+    .tooltip.show { display: block; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
 
-  const { text, targetLanguage = "Finnish" } = req.body;
+function LanguageTranslator() {
+  const [translateText, setTranslateText] = useState('I go to the city.');
+  const [targetLanguage, setTargetLanguage] = useState('Finnish');
+  const [translateLevel, setTranslateLevel] = useState('A1');
+  const [translateResult, setTranslateResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchInfo, setFetchInfo] = useState(null);
+  const [fullContent, setFullContent] = useState(null);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [stagingInfo, setStagingInfo] = useState(null);
+  const [selectionPopup, setSelectionPopup] = useState({ show: false, x: 0, y: 0, text: '' });
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, text: '' });
+  const [selectToTranslateLoading, setSelectToTranslateLoading] = useState(false);
+  
+  const CHUNK_SIZE = 3000;
+  const languages = ['Finnish', 'English', 'Spanish', 'French'];
 
-  if (!text) {
-    return res.status(400).json({ error: "Missing text" });
-  }
-
-  try {
-    const languageCodeMap = {
-      Finnish: "fi",
-      English: "en",
-      Spanish: "es",
-      French: "fr"
-    };
-
-    const targetLangCode = languageCodeMap[targetLanguage] || "fi";
-
-    // Use free MyMemory translation API
-    const url = new URL("https://api.mymemory.translated.net/get");
-    url.searchParams.append("q", text);
-    url.searchParams.append("langpair", `auto|${targetLangCode}`);
-
-    const translationResponse = await fetch(url.toString(), {
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
-
-    if (!translationResponse.ok) {
-      throw new Error(`Translation API error: ${translationResponse.statusText}`);
+  async function handleTranslate(textToTranslate = translateText, levelToUse = translateLevel) {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: textToTranslate, 
+          level: levelToUse,
+          targetLanguage: targetLanguage
+        })
+      });
+      const data = await res.json();
+      setTranslateResult(data);
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Translation error');
     }
+    setLoading(false);
+  }
 
-    const translationData = await translationResponse.json();
+  async function fetchWebContent(url) {
+    if (!url.trim()) return;
+    setLoading(true);
+    setFetchInfo(null);
+    setStagingInfo(null);
+    setFullContent(null);
+    try {
+      const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (data.content) {
+        setFullContent(data.content);
+        setCurrentChunk(0);
+        setTranslateText(data.content.substring(0, CHUNK_SIZE));
+        const displayed = data.content.length;
+        setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
+        if (data.content.length > CHUNK_SIZE) {
+          const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
+          setStagingInfo(`Chunk 1 of ${totalChunks}`);
+        }
+      } else {
+        alert('Could not fetch content from URL');
+      }
+    } catch (e) {
+      console.error('Error:', e);
+      alert('Error fetching URL');
+    }
+    setLoading(false);
+  }
+
+  function loadNextChunk() {
+    if (!fullContent) return;
+    const nextChunk = currentChunk + 1;
+    const start = nextChunk * CHUNK_SIZE;
+    const end = start + CHUNK_SIZE;
+    const nextText = fullContent.substring(start, end);
+    if (nextText) {
+      setTranslateText(nextText);
+      setCurrentChunk(nextChunk);
+      setTranslateResult(null);
+      const totalChunks = Math.ceil(fullContent.length / CHUNK_SIZE);
+      setStagingInfo(`Chunk ${nextChunk + 1} of ${totalChunks}`);
+    }
+  }
+
+  function loadPrevChunk() {
+    if (currentChunk === 0) return;
+    const prevChunk = currentChunk - 1;
+    const start = prevChunk * CHUNK_SIZE;
+    const end = start + CHUNK_SIZE;
+    const prevText = fullContent.substring(start, end);
+    setTranslateText(prevText);
+    setCurrentChunk(prevChunk);
+    setTranslateResult(null);
+    const totalChunks = Math.ceil(fullContent.length / CHUNK_SIZE);
+    setStagingInfo(`Chunk ${prevChunk + 1} of ${totalChunks}`);
+  }
+
+  function handleTextSelection(e) {
+    const selectedText = window.getSelection().toString().trim();
+    if (selectedText.length > 0) {
+      try {
+        const range = window.getSelection().getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectionPopup({
+          show: true,
+          x: rect.left + window.scrollX,
+          y: rect.top + window.scrollY - 40,
+          text: selectedText
+        });
+      } catch (e) {
+        console.error('Selection error:', e);
+      }
+    }
+  }
+
+  async function handleSelectToTranslate() {
+    if (!selectionPopup.text) return;
     
-    if (translationData.responseStatus !== 200) {
-      throw new Error("Translation API returned error");
+    setSelectToTranslateLoading(true);
+    try {
+      const res = await fetch('/api/translate-selection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: selectionPopup.text,
+          targetLanguage: 'English'
+        })
+      });
+      const data = await res.json();
+      
+      try {
+        const range = window.getSelection().getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        setTooltip({
+          show: true,
+          x: rect.left + window.scrollX,
+          y: rect.bottom + window.scrollY + 5,
+          text: data.translation || 'Translation failed'
+        });
+      } catch (e) {
+        console.error('Tooltip position error:', e);
+      }
+      
+      setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
+      
+      setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 4000);
+    } catch (e) {
+      console.error('Error:', e);
+      setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
     }
-
-    const translation = translationData.responseData.translatedText;
-
-    res.status(200).json({
-      translation,
-      originalText: text,
-      targetLanguage
-    });
-  } catch (error) {
-    console.error("Selection translation error:", error.message);
-    res.status(500).json({ error: `Translation failed: ${error.message}` });
+    setSelectToTranslateLoading(false);
   }
+
+  function changeLevel(direction) {
+    const levelOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'Simplified'];
+    const currentIndex = levelOrder.indexOf(translateLevel);
+    const newIndex = direction === 'up' ? currentIndex + 1 : currentIndex - 1;
+    
+    if (newIndex >= 0 && newIndex < levelOrder.length) {
+      const newLevel = levelOrder[newIndex];
+      setTranslateLevel(newLevel);
+      handleTranslate(translateText, newLevel);
+    }
+  }
+
+  const totalChunks = fullContent ? Math.ceil(fullContent.length / CHUNK_SIZE) : 0;
+
+  return (
+    <div className="container">
+      <h1>🌍 Language Translator</h1>
+      <h2>Translate to Your Level</h2>
+
+      <div className="form-group">
+        <label>📎 Paste Web URL:</label>
+        <div className="input-group">
+          <input 
+            type="text"
+            placeholder="https://example.com/article"
+            disabled={loading}
+            onKeyPress={(e) => { if (e.key === 'Enter') fetchWebContent(e.target.value); }}
+            onChange={(e) => {
+              if (e.target.value.trim().length > 5) {
+                const timer = setTimeout(() => { fetchWebContent(e.target.value); }, 1000);
+                return () => clearTimeout(timer);
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {fetchInfo && <div className="info-box show">{fetchInfo}</div>}
+      {stagingInfo && <div className="info-box show">{stagingInfo}</div>}
+
+      <div className="form-group">
+        <label>✏️ Text:</label>
+        <textarea 
+          value={translateText}
+          onChange={(e) => setTranslateText(e.target.value)}
+          placeholder="Paste text here..."
+          disabled={loading}
+        />
+      </div>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label>🎯 Language:</label>
+          <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} disabled={loading}>
+            {languages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>📊 Level:</label>
+          <select value={translateLevel} onChange={(e) => setTranslateLevel(e.target.value)} disabled={loading}>
+            <option value="A1">A1 (Beginner)</option>
+            <option value="A2">A2 (Elementary)</option>
+            <option value="B1">B1 (Intermediate)</option>
+            <option value="B2">B2 (Upper Intermediate)</option>
+            <option value="C1">C1 (Advanced)</option>
+            <option value="C2">C2 (Mastery)</option>
+            <option value="Simplified">Simplified</option>
+          </select>
+        </div>
+      </div>
+
+      {fullContent && totalChunks > 1 && (
+        <div className="button-row">
+          <button className="btn btn-secondary btn-small" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Prev</button>
+          <button className="btn btn-secondary btn-small" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
+        </div>
+      )}
+      
+      <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
+        {loading ? '⏳ Translating...' : '🔄 Translate'}
+      </button>
+
+      {translateResult && (
+        <div className="result-section">
+          <div className="text-column">
+            <h3>✨ {translateResult.targetLanguage} ({translateResult.level})</h3>
+            <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
+              {translateResult.translated}
+            </div>
+            <div className="level-buttons">
+              <button className="btn btn-secondary btn-small" onClick={() => changeLevel('down')} disabled={translateLevel === 'A1' || loading}>
+                ⬇️ Easier
+              </button>
+              <button className="btn btn-secondary btn-small" onClick={() => changeLevel('up')} disabled={translateLevel === 'Simplified' || loading}>
+                ⬆️ Harder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectionPopup.show && (
+        <div className="selection-popup show" style={{ left: `${selectionPopup.x}px`, top: `${selectionPopup.y}px` }}>
+          <button 
+            className="btn btn-secondary btn-small" 
+            onClick={handleSelectToTranslate}
+            disabled={selectToTranslateLoading}
+          >
+            {selectToTranslateLoading ? '⏳' : '🔤'} English
+          </button>
+        </div>
+      )}
+
+      {tooltip.show && (
+        <div className="tooltip show" style={{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }}>
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  );
 }
+
+ReactDOM.render(<LanguageTranslator />, document.getElementById('root'));
+</script>
+</body>
+</html>
 
