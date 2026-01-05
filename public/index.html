@@ -146,12 +146,15 @@ function LanguageTranslator() {
   }
 
   function handleTextSelection(e) {
+    console.log('handleTextSelection called on:', e.target.className);
     const selectedText = window.getSelection().toString().trim();
-    console.log('Selected text:', selectedText);
+    console.log('Selected text:', selectedText, 'Length:', selectedText.length);
     if (selectedText.length > 0) {
       try {
         const range = window.getSelection().getRangeAt(0);
         const rect = range.getBoundingClientRect();
+        console.log('Selection rect:', rect);
+        console.log('Setting popup:', { show: true, x: rect.left + window.scrollX, y: rect.top + window.scrollY - 40, text: selectedText });
         setSelectionPopup({
           show: true,
           x: rect.left + window.scrollX,
@@ -161,6 +164,8 @@ function LanguageTranslator() {
       } catch (e) {
         console.error('Selection error:', e);
       }
+    } else {
+      console.log('Selection text too short');
     }
   }
 
