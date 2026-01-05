@@ -30,7 +30,9 @@
     .btn-small { padding: 8px 16px; font-size: 12px; }
     .info-box { display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #333; }
     .info-box.show { display: block; }
-    .parallel-view { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+    .chunk-box { background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+    .chunk-box p { font-size: 12px; color: #333; margin: 0 0 10px 0; font-weight: bold; }
+    .result-section { margin-top: 30px; }
     .text-column { background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
     .text-column h3 { color: #667eea; margin-bottom: 15px; }
     .text-box { background: white; padding: 15px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; border: 1px solid #e5e7eb; position: relative; min-height: 300px; overflow-y: auto; }
@@ -238,7 +240,16 @@ function LanguageTranslator() {
       </div>
 
       {fetchInfo && <div className="info-box show">{fetchInfo}</div>}
-      {stagingInfo && <div className="info-box show">{stagingInfo}</div>}
+
+      {fullContent && totalChunks > 1 && (
+        <div className="chunk-box">
+          <p>📄 {stagingInfo}</p>
+          <div className="button-row">
+            <button className="btn btn-secondary btn-small" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Previous</button>
+            <button className="btn btn-secondary btn-small" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
+          </div>
+        </div>
+      )}
 
       <div className="form-group">
         <label>✏️ Text:</label>
@@ -270,20 +281,13 @@ function LanguageTranslator() {
           </select>
         </div>
       </div>
-
-      {fullContent && totalChunks > 1 && (
-        <div className="button-row">
-          <button className="btn btn-secondary btn-small" onClick={loadPrevChunk} disabled={loading || currentChunk === 0}>← Prev</button>
-          <button className="btn btn-secondary btn-small" onClick={loadNextChunk} disabled={loading || currentChunk >= totalChunks - 1}>Next →</button>
-        </div>
-      )}
       
       <button className="btn" onClick={() => handleTranslate()} disabled={loading || !translateText.trim()} style={{width:'100%'}}>
         {loading ? '⏳ Translating...' : '🔄 Translate'}
       </button>
 
       {translateResult && (
-        <div className="parallel-view">
+        <div className="result-section">
           <div className="text-column">
             <h3>✨ {translateResult.targetLanguage} ({translateResult.level})</h3>
             <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
@@ -296,12 +300,6 @@ function LanguageTranslator() {
               <button className="btn btn-secondary btn-small" onClick={() => changeLevel('up')} disabled={translateLevel === 'Simplified' || loading}>
                 ⬆️ Harder
               </button>
-            </div>
-          </div>
-          <div className="text-column">
-            <h3>📖 Original</h3>
-            <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
-              {translateText}
             </div>
           </div>
         </div>
