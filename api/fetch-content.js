@@ -16,16 +16,43 @@ export default async function handler(req, res) {
     
     const html = await response.text();
     
-    // Strip HTML tags
-    let plainText = html
+    // Remove script and style tags
+    let cleaned = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
+      .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '')
+      .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '')
+      .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, '');
+    
+    // Extract main content - look for article/main/content tags first
+    let mainContent = '';
+    const articleMatch = cleaned.match(/<article[^>]*>(.*?)<\/article>/is);
+    const mainMatch = cleaned.match(/<main[^>]*>(.*?)<\/main>/is);
+    const contentMatch = cleaned.match(/<div[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)<\/div>/is);
+    
+    if (articleMatch) {
+      mainContent = articleMatch[1];
+    } else if (mainMatch) {
+      mainContent = mainMatch[1];
+    } else if (contentMatch) {
+      mainContent = contentMatch[1];
+    } else {
+      mainContent = cleaned;
+    }
+    
+    // Remove remaining HTML tags
+    let plainText = mainContent
       .replace(/<[^>]*>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
-      .replace(/\n\n+/g, '\n')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      // Remove excessive whitespace
+      .replace(/\n\s*\n/g, '\n')
+      .replace(/\s+/g, ' ')
       .trim();
     
     console.log(`Fetched and cleaned: ${plainText.length} characters`);
