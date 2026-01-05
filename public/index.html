@@ -53,12 +53,6 @@ function FinnishMVP() {
   const [stagingInfo, setStagingInfo] = useState(null);
   const CHUNK_SIZE = 3000;
 
-  function stripHtml(html) {
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    return temp.textContent || temp.innerText || '';
-  }
-
   async function handleTranslate() {
     setLoading(true);
     try {
@@ -88,7 +82,7 @@ function FinnishMVP() {
       console.log('Fetch response length:', data.content.length);
       if (data.content) {
         // Store cleaned content for staged reading
-        const cleanedContent = stripHtml(data.content);
+        const cleanedContent = data.content;
         setFullContent(cleanedContent);
         setCurrentChunk(0);
         
