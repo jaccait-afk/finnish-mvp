@@ -30,7 +30,7 @@
     .btn-small { padding: 8px 16px; font-size: 12px; }
     .info-box { display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px; font-size: 12px; color: #333; }
     .info-box.show { display: block; }
-    .chunk-box { background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+    .chunk-box { background: #f0fdf4; border: 1px solid #10b981; border-radius: 8px; padding: 12px; margin-top: 15px; }
     .chunk-box p { font-size: 12px; color: #333; margin: 0 0 10px 0; font-weight: bold; }
     .result-section { margin-top: 30px; }
     .text-column { background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
@@ -147,6 +147,7 @@ function LanguageTranslator() {
 
   function handleTextSelection(e) {
     const selectedText = window.getSelection().toString().trim();
+    console.log('Selected text:', selectedText);
     if (selectedText.length > 0) {
       try {
         const range = window.getSelection().getRangeAt(0);
@@ -164,8 +165,12 @@ function LanguageTranslator() {
   }
 
   async function handleSelectToTranslate() {
-    if (!selectionPopup.text) return;
+    if (!selectionPopup.text) {
+      console.error('No text to translate');
+      return;
+    }
     
+    console.log('Translating:', selectionPopup.text);
     setSelectToTranslateLoading(true);
     try {
       const res = await fetch('/api/translate-selection', {
@@ -176,7 +181,9 @@ function LanguageTranslator() {
           targetLanguage: 'English'
         })
       });
+      console.log('API response status:', res.status);
       const data = await res.json();
+      console.log('API response data:', data);
       
       try {
         const range = window.getSelection().getRangeAt(0);
@@ -186,7 +193,7 @@ function LanguageTranslator() {
           show: true,
           x: rect.left + window.scrollX,
           y: rect.bottom + window.scrollY + 5,
-          text: data.translation || 'Translation failed'
+          text: data.translation || data.error || 'Translation failed'
         });
       } catch (e) {
         console.error('Tooltip position error:', e);
@@ -196,7 +203,7 @@ function LanguageTranslator() {
       
       setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 4000);
     } catch (e) {
-      console.error('Error:', e);
+      console.error('Select to translate error:', e);
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
     }
     setSelectToTranslateLoading(false);
@@ -241,6 +248,18 @@ function LanguageTranslator() {
 
       {fetchInfo && <div className="info-box show">{fetchInfo}</div>}
 
+      <div className="form-group">
+        <label>✏️ Text:</label>
+        <textarea 
+          value={translateText}
+          onChange={(e) => setTranslateText(e.target.value)}
+          onMouseUp={handleTextSelection}
+          onTouchEnd={handleTextSelection}
+          placeholder="Paste text here..."
+          disabled={loading}
+        />
+      </div>
+
       {fullContent && totalChunks > 1 && (
         <div className="chunk-box">
           <p>📄 {stagingInfo}</p>
@@ -250,16 +269,6 @@ function LanguageTranslator() {
           </div>
         </div>
       )}
-
-      <div className="form-group">
-        <label>✏️ Text:</label>
-        <textarea 
-          value={translateText}
-          onChange={(e) => setTranslateText(e.target.value)}
-          placeholder="Paste text here..."
-          disabled={loading}
-        />
-      </div>
 
       <div className="form-row">
         <div className="form-group">
