@@ -14,23 +14,19 @@ export default async function handler(req, res) {
       return res.status(response.status).json({ error: `Failed to fetch: ${response.statusText}` });
     }
     
-    const html = await response.text();
-    
-    // Better text extraction - look for article/content tags
-    let plainText = html
-      // Remove scripts and styles
+    const text = await response.text();
+    const plainText = text
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      // Remove HTML tags but keep content
-      .replace(/<[^>]+>/g, ' ')
-      // Clean up whitespace
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 3000);
+      .replace(/<[^>]*>/g, '')
+      .replace(/\n\n+/g, '\n')
+      .trim();
+    
+    console.log(`Fetched content length: ${plainText.length} characters`);
     
     res.status(200).json({ 
-      content: plainText || 'No content found',
-      url
+      content: plainText,
+      totalLength: plainText.length,
+      truncated: false
     });
   } catch (e) {
     console.error('Fetch error:', e.message);
