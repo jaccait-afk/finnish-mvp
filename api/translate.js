@@ -29,31 +29,25 @@ export default async function handler(req, res) {
     return String(obj);
   }
 
-  async function fetchWithTimeout(url, options, timeoutMs = 30000) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  async function tryGeminiModel(geminiKey, model) {
+    console.log(`Attempting Gemini ${model}...`);
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      console.log('Attempting Gemini translation (PRIMARY)...');
-      const geminiResponse = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
+              }]
             }]
-          }]
-        })
-      }, 30000);
+          })
+        }
+      );
+
+      console.log(`${model} response: ${geminiResponse.status}`);
 
       if (geminiResponse.ok) {
         const geminiData = await geminiResponse.json();
@@ -64,42 +58,86 @@ export default async function handler(req, res) {
           const parsed = JSON.parse(cleanContent);
           const translated = extractText(parsed.translated);
           const englishBackTranslation = parsed.englishBackTranslation ? extractText(parsed.englishBackTranslation) : null;
-          console.log('Gemini succeeded');
-          return res.json({ translated, englishBackTranslation, targetLanguage, level, model: 'Gemini' });
+          console.log(`${model} succeeded`);
+          return { success: true, translated, englishBackTranslation, model };
         } catch (e) {
-          console.error('Gemini parse error:', e);
-          return res.json({ translated: cleanContent, englishBackTranslation: null, targetLanguage, level, model: 'Gemini' });
+          console.error(`${model} parse error:`, e.message);
+          return { success: true, translated: cleanContent, englishBackTranslation: null, model };
         }
+      } else if (geminiResponse.status === 429) {
+        console.error(`${model} rate limited (429)`);
+        return { success: false, rateLimited: true };
+      } else {
+        console.error(`${model} HTTP error: ${geminiResponse.status}`);
+        return { success: false };
       }
-    } catch (geminiError) {
-      console.error('Gemini failed:', geminiError.message);
+    } catch (e) {
+      console.error(`${model} error:`, e.message);
+      return { success: false };
     }
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+
+  if (geminiKey) {
+    for (const model of geminiModels) {
+      const result = await tryGeminiModel(geminiKey, model);
+      if (result.success) {
+        return res.json({ ...result, targetLanguage, level });
+      }
+    }
+    console.log('All Gemini models failed, trying Mistral...');
   }
 
   const mistralKey = process.env.MISTRAL_API_KEY;
   if (!mistralKey) {
-    return res.status(500).json({ error: 'No API keys configured' });
+    return res.status(500).json({ error: 'MISTRAL_API_KEY not configured' });
   }
 
   try {
-    console.log('Attempting Mistral translation (FALLBACK)...');
-    const mistralResponse = await fetchWithTimeout('https://api.mistral.ai/v1/chat/completions', {
+    console.log('Attempting Mistral translation...');
+    console.log('Mistral Key length:', mistralKey.length);
+    console.log('Mistral Key starts with:', mistralKey.substring(0, 10));
+    
+    const bodyPayload = {
+      model: 'mistral-large-latest',
+      messages: [{
+        role: 'user',
+        content: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY JSON:\n{"translated": "text", "englishBackTranslation": "English or null"}`
+      }]
+    };
+
+    console.log('Request body prepared');
+    console.log('Full authorization header:', `Bearer ${mistralKey.substring(0, 10)}...`);
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+    const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${mistralKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages: [{
-          role: 'user',
-          content: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY JSON:\n{"translated": "text", "englishBackTranslation": "English or null"}`
-        }]
-      })
-    }, 30000);
+      headers: { 
+        'Authorization': `Bearer ${mistralKey}`, 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    console.log('Mistral response received:', mistralResponse.status);
 
     if (!mistralResponse.ok) {
-      throw new Error(`Mistral ${mistralResponse.status}`);
+      const errorText = await mistralResponse.text();
+      console.error('Mistral HTTP error:', mistralResponse.status, errorText);
+      throw new Error(`Mistral HTTP ${mistralResponse.status}: ${errorText}`);
     }
 
     const data = await mistralResponse.json();
+    console.log('Mistral data parsed');
+    
     if (!data.choices || !data.choices || !data.choices.message) {
       throw new Error('Mistral format error');
     }
@@ -116,13 +154,13 @@ export default async function handler(req, res) {
       console.log('Mistral succeeded');
       return res.json({ translated, englishBackTranslation, targetLanguage, level, model: 'Mistral' });
     } catch (e) {
-      console.error('Mistral parse error:', e);
+      console.error('Mistral parse error:', e.message);
       return res.json({ translated: content, englishBackTranslation: null, targetLanguage, level, model: 'Mistral' });
     }
 
   } catch (mistralError) {
     console.error('Mistral failed:', mistralError.message);
-    return res.status(500).json({ error: 'Both APIs failed' });
+    return res.status(500).json({ error: mistralError.message });
   }
 }
 
