@@ -1,4 +1,4 @@
-kexport default async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -25,91 +25,101 @@ kexport default async function handler(req, res) {
         model: 'mistral-large-latest',
         messages: [{
           role: 'user',
-          content: `Translate this text to ${targetLanguage} at CEFR ${level} level (keep it natural for that level, maintain original meaning):
+          content: `Translate this text to ${targetLanguage} at CEFR ${level} level (keep it natural for that level):
 
 Text: "${text.replace(/"/g, '\\"')}"
 
-Respond in JSON format:
-{
-  "translated": "[translation here]",
-  "englishBackTranslation": "[English translation of the translated text - only if target is not English]"
-}
-
-Example if translating to Finnish A1:
-{
-  "translated": "Minä menen kaupunkiin.",
-  "englishBackTranslation": "I go to the city."
-}`
+Return ONLY a JSON object (no other text):
+{"translated": "your translation here", "englishBackTranslation": "English version of translation (or null if target is English)"}`
         }]
       })
     });
 
-    if (mistralResponse.ok) {
-      const data = await mistralResponse.json();
-      const content = data.choices[0].message.content.trim();
-      
-      try {
-        const parsed = JSON.parse(content);
-        return res.json({
-          translated: parsed.translated,
-          englishBackTranslation: parsed.englishBackTranslation || null,
-          targetLanguage,
-          level,
-          model: 'Mistral'
-        });
-      } catch (e) {
-        return res.json({
-          translated: content,
-          englishBackTranslation: null,
-          targetLanguage,
-          level,
-          model: 'Mistral'
-        });
-      }
+    if (!mistralResponse.ok) {
+      console.error('Mistral error:', mistralResponse.status);
+      throw new Error(`Mistral API error: ${mistralResponse.status}`);
     }
 
+    const data = await mistralResponse.json();
+    const content = data.choices[0].message.content.trim();
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, 'Content:', content);
+      return res.json({
+        translated: content,
+        englishBackTranslation: null,
+        targetLanguage,
+        level,
+        model: 'Mistral'
+      });
+    }
+
+    return res.json({
+      translated: parsed.translated || content,
+      englishBackTranslation: parsed.englishBackTranslation || null,
+      targetLanguage,
+      level,
+      model: 'Mistral'
+    });
+
+  } catch (mistralError) {
+    console.error('Mistral error, trying Gemini:', mistralError);
+    
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
       return res.status(500).json({ error: 'Fallback API not configured' });
     }
 
-    const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nRespond in JSON:\n{\n  "translated": "[translation]",\n  "englishBackTranslation": "[English of translation - skip if target is English]"\n}`
-          }]
-        }]
-      })
-    });
-
-    const geminiData = await geminiResponse.json();
-    const geminiContent = geminiData.candidates[0].content.parts[0].text;
-    
     try {
-      const parsed = JSON.parse(geminiContent);
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nReturn ONLY JSON (no other text):\n{"translated": "translation", "englishBackTranslation": "English or null"}`
+            }]
+          }]
+        })
+      });
+
+      if (!geminiResponse.ok) {
+        console.error('Gemini error:', geminiResponse.status);
+        throw new Error(`Gemini API error: ${geminiResponse.status}`);
+      }
+
+      const geminiData = await geminiResponse.json();
+      const geminiContent = geminiData.candidates[0].content.parts[0].text;
+
+      let parsed;
+      try {
+        parsed = JSON.parse(geminiContent);
+      } catch (parseError) {
+        console.error('Gemini JSON parse error:', parseError);
+        return res.json({
+          translated: geminiContent,
+          englishBackTranslation: null,
+          targetLanguage,
+          level,
+          model: 'Gemini'
+        });
+      }
+
       return res.json({
-        translated: parsed.translated,
+        translated: parsed.translated || geminiContent,
         englishBackTranslation: parsed.englishBackTranslation || null,
         targetLanguage,
         level,
         model: 'Gemini'
       });
-    } catch (e) {
-      return res.json({
-        translated: geminiContent,
-        englishBackTranslation: null,
-        targetLanguage,
-        level,
-        model: 'Gemini'
-      });
-    }
 
-  } catch (error) {
-    console.error('Translation error:', error);
-    return res.status(500).json({ error: 'Translation failed' });
+    } catch (geminiError) {
+      console.error('Both APIs failed:', mistralError, geminiError);
+      return res.status(500).json({ error: 'Translation failed on both APIs' });
+    }
   }
 }
 
