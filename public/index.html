@@ -98,13 +98,34 @@ function LanguageTranslator() {
       const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
       const data = await res.json();
       if (data.content) {
-        setFullContent(data.content);
+        // Format with clear line breaks for readability
+        // Split by sentence and add line breaks every 3-4 sentences
+        const sentences = data.content.split(/(?<=[.!?])\s+/);
+        let formattedContent = '';
+        let sentenceCount = 0;
+        
+        for (let i = 0; i < sentences.length; i++) {
+          formattedContent += sentences[i] + ' ';
+          sentenceCount++;
+          
+          // Add line break every 3 sentences for readability
+          if (sentenceCount === 3) {
+            formattedContent += '\n\n';
+            sentenceCount = 0;
+          }
+        }
+        
+        // Remove only excessive empty lines (keep single line breaks)
+        let cleanedDisplay = formattedContent.replace(/\n\n\n+/g, '\n\n');
+        cleanedDisplay = cleanedDisplay.trim();
+        
+        setFullContent(formattedContent);
         setCurrentChunk(0);
-        setTranslateText(data.content.substring(0, CHUNK_SIZE));
-        const displayed = data.content.length;
-        setFetchInfo(`✓ Fetched ${displayed.toLocaleString()} characters`);
-        if (data.content.length > CHUNK_SIZE) {
-          const totalChunks = Math.ceil(data.content.length / CHUNK_SIZE);
+        setTranslateText(cleanedDisplay.substring(0, 15000)); // Show more content
+        setFetchInfo(`✓ Fetched ${cleanedDisplay.length.toLocaleString()} characters`);
+        
+        if (formattedContent.length > CHUNK_SIZE) {
+          const totalChunks = Math.ceil(formattedContent.length / CHUNK_SIZE);
           setStagingInfo(`Chunk 1 of ${totalChunks}`);
         }
       } else {
@@ -154,7 +175,6 @@ function LanguageTranslator() {
         const range = window.getSelection().getRangeAt(0);
         const rect = range.getBoundingClientRect();
         console.log('Selection rect:', rect);
-        console.log('Setting popup:', { show: true, x: rect.left + window.scrollX, y: rect.top + window.scrollY - 40, text: selectedText });
         setSelectionPopup({
           show: true,
           x: rect.left + window.scrollX,
@@ -164,8 +184,6 @@ function LanguageTranslator() {
       } catch (e) {
         console.error('Selection error:', e);
       }
-    } else {
-      console.log('Selection text too short');
     }
   }
 

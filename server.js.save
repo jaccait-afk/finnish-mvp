@@ -1,68 +1,79 @@
+
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
-
+const path = require('path');
 const app = express();
-const PORT = process.env.PORT || 3001;
-const JWT_SECRET = 'finnish-mvp-2026-secret';
+const port = 3001;
 
-app.use(helmet());
-app.use(cors({ origin: '*' }));
-const limiter = rateLimit({ windowMs: 15*60*1000, max: 100 });
-app.use(limiter);
-app.use(express.json({ limit: '10kb' }));
-app.use(express.static('public'));
+app.use(express.json());
 
-const db = new sqlite3.Database(':memory:');
-db.serialize(() => {
-  db.run(`CREATE TABLE users (id INTEGER PRIMARY KEY, knowledge_map TEXT, token TEXT)`);
-  db.run(`CREATE TABLE sessions (id INTEGER PRIMARY KEY, user_id INTEGER, concept TEXT, mastery REAL)`);
+app.use((req, res, next) => {
+  res.removeHeader('Content-Security-Policy');
+  next();
 });
 
-const CASE_QUESTIONS = [
-  { sentence: "Menen kotiin.", english: "I go home.", options: ['illative', 'inessive', 'nominative', 'genitive'], correct: 'illative' },
-  { sentence: "Kirja on pöydällä.", english: "Book on table.", options: ['adessive', 'ablative', 'illative', 'elative'], correct: 'adessive' },
-  { sentence: "Talo on kaupungissa.", english: "House in city.", options: ['inessive', 'illative', 'elative', 'ablative'], correct: 'inessive' },
-  { sentence: "Lapsi nukkuu sängyssä.", english: "Child in bed.", options: ['inessive', 'elative', 'illative', 'adessive'], correct: 'inessive' },
-  { sentence: "Otan kirjan hyllystä.", english: "Book from shelf.", options: ['elative', 'illative', 'ablative', 'adessive'], correct: 'elative' }
-]
-const path
-app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.post('/api/user', (req, res) => {
-  const token = jwt.sign({id: 1}, JWT_SECRET);
-  db.run('INSERT OR REPLACE INTO users (id, token) VALUES (1, ?)', [token]);
-  res.json({token});
+  res.json({ token: 'demo-token-123' });
 });
 
 app.post('/api/diagnostic', (req, res) => {
+  res.json({
+    overall: 72,
+    cases: { illative: 85, inessive: 68, adessive: 71, elative: 59 }
+  });
+});
+app.post('/api/translate', (req, res) => {
+let text = req.body.text || 'I go to the city.';
+const level = req.body.level || 'A1';
+
+const translations = {
+A1: { finnish: 'Minä menen kaupunkiin.', pronunciation: 'MEE-nuh MEN-en KAH-poon-kiin' },
+A2: { finnish: 'Menen kaupunkiin jokapäivä.', pronunciation: 'MEN-en KAH-poon-kiin YO-kah-PAH-ee-vuh' },
+B1: { finnish: 'Käyn kaupungissa ostoksilla.', pronunciation: 'KAH-oon KAH-poon-GEES-sah OS-tok-sil-lah' }
+};
+
+app.get('/api/fetch-content', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'No URL provided' });
+  
   try {
-    const { token, answers } = req.body;
-    jwt.verify(token, JWT_SECRET);
-    
-    if (!Array.isArray(answers) || answers.length !== 5) return res.status(400).json({error: 'Invalid'});
-    
-    let score = 0;
-    const mastery = {};
-    CASE_QUESTIONS.forEach((q, i) => {
-      if (answers[i] === q.correct) score++;
-      mastery[q.correct] = mastery[q.correct] || 0;
-      mastery[q.correct] += answers[i] === q.correct ? 1 : 0;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     });
     
-    const overall = Math.round((score / 5) * 100);
-    const result = { overall, cases: mastery, weak: overall < 70 ? ['illative'] : [] };
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Failed to fetch: ${response.statusText}` });
+    }
     
-    db.run('UPDATE users SET knowledge_map = ? WHERE id = 1', [JSON.stringify(result)]);
-    res.json(result);
-  } catch {
-    res.status(401).json({error: 'Unauthorized'});
+    const text = await response.text();
+    const plainText = text
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\n\n+/g, '\n')
+      .trim()
+      .substring(0, 3000);
+    
+    res.json({ content: plainText || 'No content found' });
+  } catch (e) {
+    console.error('Fetch error:', e.message);
+    res.status(500).json({ error: `Server error: ${e.message}` });
   }
 });
 
-app.get('/api/map', (req, res) => res.json({cases: {illative: 35, inessive: 42, adessive: 68, nominative: 95}}));
-app.listen(PORT, () => console.log(`Finnish MVP: http://localhost:${PORT}`));
+const result = translations[level] || translations.A1;
 
-module.exports = app;
+res.json({
+english: text,
+finnish: result.finnish,
+pronunciation: result.pronunciation,
+level: level
+});
+});
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Finnish MVP ready: http://localhost:${port}`);
+});
