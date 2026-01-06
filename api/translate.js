@@ -26,11 +26,11 @@ export default async function handler(req, res) {
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: `Translate this English text to ${targetLanguage} at ${level} level:\n\n"${text}"\n\nProvide ONLY the translation.`
+                  text: `Translate this English text to ${targetLanguage} at ${level} level:\n\n"${text}"\n\nRespond with ONLY valid JSON (no markdown, no extra text):\n{"translated": "the translation", "englishBackTranslation": "what the translation means in English or null"}`
                 }]
               }],
               generationConfig: {
-                maxOutputTokens: 256
+                maxOutputTokens: 512
               }
             })
           }
@@ -38,9 +38,32 @@ export default async function handler(req, res) {
 
         if (response.ok) {
           const data = await response.json();
-          const translated = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (translated) {
-            return res.json({ translated, model, targetLanguage, level });
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (content) {
+            try {
+              // Clean markdown code fences if present
+              let cleanContent = content.trim();
+              if (cleanContent.startsWith('```')) {
+                cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+              }
+              const parsed = JSON.parse(cleanContent);
+              return res.json({ 
+                translated: parsed.translated, 
+                englishBackTranslation: parsed.englishBackTranslation || null,
+                model, 
+                targetLanguage, 
+                level 
+              });
+            } catch (e) {
+              // If JSON parse fails, return raw content as translation
+              return res.json({ 
+                translated: content, 
+                englishBackTranslation: null,
+                model, 
+                targetLanguage, 
+                level 
+              });
+            }
           }
         }
       } catch (e) {
@@ -55,7 +78,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    // First, get the translation
+    const translateResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${mistralKey}`,
@@ -65,20 +89,57 @@ export default async function handler(req, res) {
         model: 'mistral-large-latest',
         messages: [{
           role: 'user',
-          content: `Translate this English text to ${targetLanguage} at ${level} level:\n\n"${text}"\n\nProvide ONLY the translation.`
+          content: `Translate this English text to ${targetLanguage} at ${level} level:\n\n"${text}"\n\nRespond with ONLY the translation, nothing else.`
         }],
-        max_tokens: 256
+        max_tokens: 512
       })
     });
 
-    if (!response.ok) {
+    if (!translateResponse.ok) {
       return res.status(500).json({ error: 'Translation failed' });
     }
 
-    const data = await response.json();
-    const translated = data.choices?.[0]?.message?.content;
+    const translateData = await translateResponse.json();
+    const translated = translateData.choices?.?.message?.content?.trim();
     
-    return res.json({ translated: translated || '', model: 'Mistral', targetLanguage, level });
+    if (!translated) {
+      return res.status(500).json({ error: 'No translation returned' });
+    }
+
+    // Then, get the English back-translation
+    let englishBackTranslation = null;
+    try {
+      const backTranslateResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${mistralKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'mistral-large-latest',
+          messages: [{
+            role: 'user',
+            content: `What does this ${targetLanguage} text mean in English? Provide a brief, natural English explanation.\n\n"${translated}"\n\nRespond with ONLY the English explanation, nothing else.`
+          }],
+          max_tokens: 256
+        })
+      });
+
+      if (backTranslateResponse.ok) {
+        const backData = await backTranslateResponse.json();
+        englishBackTranslation = backData.choices?.?.message?.content?.trim() || null;
+      }
+    } catch (e) {
+      // If back-translation fails, just continue without it
+    }
+
+    return res.json({ 
+      translated, 
+      englishBackTranslation,
+      model: 'Mistral', 
+      targetLanguage, 
+      level 
+    });
 
   } catch (e) {
     return res.status(500).json({ error: 'Server error' });
