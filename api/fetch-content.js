@@ -1,49 +1,41 @@
 export default async function handler(req, res) {
   const { url } = req.query;
-  
+
   if (!url) {
-    return res.status(400).json({ error: 'No URL provided' });
+    return res.status(400).json({ error: 'URL required' });
   }
-  
+
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LanguageTranslator/1.0)'
+      }
     });
-    
+
     if (!response.ok) {
-      return res.status(response.status).json({ error: `Failed to fetch: ${response.statusText}` });
+      return res.status(500).json({ error: 'Failed to fetch content' });
     }
-    
+
     const html = await response.text();
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const contentMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i) || 
+                        html.match(/<main[^>]*>([\s\S]*?)<\/main>/i) ||
+                        html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+
+    let content = contentMatch ? contentMatch[1] : html;
     
-    // Remove script and style tags
-    let cleaned = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    
-    // Remove all HTML tags
-    let plainText = cleaned.replace(/<[^>]+>/g, '');
-    
-    // Decode HTML entities
-    plainText = plainText
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'");
-    
-    // Clean up whitespace aggressively
-    plainText = plainText.replace(/\t+/g, ' ');
-    plainText = plainText.replace(/  +/g, ' ');
-    plainText = plainText.replace(/\n\n\n+/g, '\n'); // Multiple blank lines to single
-    plainText = plainText.trim();
-    
-    res.status(200).json({ 
-      content: plainText,
-      totalLength: plainText.length
+    // Basic HTML to text
+    content = content.replace(/<[^>]*>/g, ' ');
+    content = content.replace(/\s+/g, ' ').trim();
+
+    return res.json({
+      title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+      content: content.substring(0, 50000) // Limit size
     });
-  } catch (e) {
-    res.status(500).json({ error: `Server error: ${e.message}` });
+
+  } catch (error) {
+    console.error('Fetch error:', error);
+    return res.status(500).json({ error: 'Failed to process URL' });
   }
 }
 
