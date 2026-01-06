@@ -29,8 +29,8 @@ export default async function handler(req, res) {
 
 Text: "${text.replace(/"/g, '\\"')}"
 
-Return ONLY a JSON object (no other text):
-{"translated": "your translation here", "englishBackTranslation": "English version of translation (or null if target is English)"}`
+Output ONLY valid JSON, nothing else:
+{"translated": "translation text here", "englishBackTranslation": "English translation of the translated text (null if target is English)"}`
         }]
       })
     });
@@ -41,13 +41,18 @@ Return ONLY a JSON object (no other text):
     }
 
     const data = await mistralResponse.json();
-    const content = data.choices[0].message.content.trim();
+    let content = data.choices[0].message.content.trim();
+    
+    // Strip markdown code blocks if present
+    if (content.startsWith('```')) {
+      content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
     
     let parsed;
     try {
       parsed = JSON.parse(content);
     } catch (parseError) {
-      console.error('JSON parse error:', parseError, 'Content:', content);
+      console.error('Mistral JSON parse error:', parseError, 'Content:', content);
       return res.json({
         translated: content,
         englishBackTranslation: null,
@@ -58,7 +63,7 @@ Return ONLY a JSON object (no other text):
     }
 
     return res.json({
-      translated: parsed.translated || content,
+      translated: typeof parsed.translated === 'string' ? parsed.translated : JSON.stringify(parsed.translated),
       englishBackTranslation: parsed.englishBackTranslation || null,
       targetLanguage,
       level,
@@ -80,19 +85,23 @@ Return ONLY a JSON object (no other text):
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nReturn ONLY JSON (no other text):\n{"translated": "translation", "englishBackTranslation": "English or null"}`
+              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation", "englishBackTranslation": "English version or null"}`
             }]
           }]
         })
       });
 
       if (!geminiResponse.ok) {
-        console.error('Gemini error:', geminiResponse.status);
         throw new Error(`Gemini API error: ${geminiResponse.status}`);
       }
 
       const geminiData = await geminiResponse.json();
-      const geminiContent = geminiData.candidates[0].content.parts[0].text;
+      let geminiContent = geminiData.candidates.content.parts.text.trim();
+
+      // Strip markdown if present
+      if (geminiContent.startsWith('```')) {
+        geminiContent = geminiContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      }
 
       let parsed;
       try {
@@ -109,7 +118,7 @@ Return ONLY a JSON object (no other text):
       }
 
       return res.json({
-        translated: parsed.translated || geminiContent,
+        translated: typeof parsed.translated === 'string' ? parsed.translated : JSON.stringify(parsed.translated),
         englishBackTranslation: parsed.englishBackTranslation || null,
         targetLanguage,
         level,
