@@ -36,6 +36,7 @@
     .text-column { background: #f9f9f9; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; }
     .text-column h3 { color: #667eea; margin-bottom: 15px; }
     .text-box { background: white; padding: 15px; border-radius: 8px; line-height: 1.8; flex-grow: 1; user-select: text; border: 1px solid #e5e7eb; position: relative; min-height: 300px; overflow-y: auto; }
+    .english-translation { background: white; padding: 15px; border-radius: 8px; margin-top: 15px; line-height: 1.8; user-select: text; border: 1px solid #e5e7eb; font-style: italic; color: #555; }
     .level-buttons { display: flex; gap: 10px; margin-top: 15px; }
     .level-buttons button { flex: 1; }
     .selection-popup { position: fixed; background: white; border: 1px solid #667eea; border-radius: 6px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; display: none; }
@@ -98,8 +99,6 @@ function LanguageTranslator() {
       const res = await fetch(`/api/fetch-content?url=${encodeURIComponent(url)}`);
       const data = await res.json();
       if (data.content) {
-        // Format with clear line breaks for readability
-        // Split by sentence and add line breaks every 3-4 sentences
         const sentences = data.content.split(/(?<=[.!?])\s+/);
         let formattedContent = '';
         let sentenceCount = 0;
@@ -108,20 +107,18 @@ function LanguageTranslator() {
           formattedContent += sentences[i] + ' ';
           sentenceCount++;
           
-          // Add line break every 3 sentences for readability
           if (sentenceCount === 3) {
             formattedContent += '\n\n';
             sentenceCount = 0;
           }
         }
         
-        // Remove only excessive empty lines (keep single line breaks)
         let cleanedDisplay = formattedContent.replace(/\n\n\n+/g, '\n\n');
         cleanedDisplay = cleanedDisplay.trim();
         
         setFullContent(formattedContent);
         setCurrentChunk(0);
-        setTranslateText(cleanedDisplay.substring(0, 15000)); // Show more content
+        setTranslateText(cleanedDisplay.substring(0, 15000));
         setFetchInfo(`✓ Fetched ${cleanedDisplay.length.toLocaleString()} characters`);
         
         if (formattedContent.length > CHUNK_SIZE) {
@@ -167,14 +164,11 @@ function LanguageTranslator() {
   }
 
   function handleTextSelection(e) {
-    console.log('handleTextSelection called on:', e.target.className);
     const selectedText = window.getSelection().toString().trim();
-    console.log('Selected text:', selectedText, 'Length:', selectedText.length);
     if (selectedText.length > 0) {
       try {
         const range = window.getSelection().getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        console.log('Selection rect:', rect);
         setSelectionPopup({
           show: true,
           x: rect.left + window.scrollX,
@@ -189,11 +183,9 @@ function LanguageTranslator() {
 
   async function handleSelectToTranslate() {
     if (!selectionPopup.text) {
-      console.error('No text to translate');
       return;
     }
     
-    console.log('Translating:', selectionPopup.text);
     setSelectToTranslateLoading(true);
     try {
       const res = await fetch('/api/translate-selection', {
@@ -204,9 +196,7 @@ function LanguageTranslator() {
           targetLanguage: 'English'
         })
       });
-      console.log('API response status:', res.status);
       const data = await res.json();
-      console.log('API response data:', data);
       
       try {
         const range = window.getSelection().getRangeAt(0);
@@ -223,7 +213,6 @@ function LanguageTranslator() {
       }
       
       setSelectionPopup({ show: false, x: 0, y: 0, text: '' });
-      
       setTimeout(() => setTooltip({ show: false, x: 0, y: 0, text: '' }), 4000);
     } catch (e) {
       console.error('Select to translate error:', e);
@@ -325,6 +314,11 @@ function LanguageTranslator() {
             <div className="text-box" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
               {translateResult.translated}
             </div>
+            {translateResult.targetLanguage !== 'English' && translateResult.englishBackTranslation && (
+              <div className="english-translation">
+                <strong>🇬🇧 English:</strong><br/>{translateResult.englishBackTranslation}
+              </div>
+            )}
             <div className="level-buttons">
               <button className="btn btn-secondary btn-small" onClick={() => changeLevel('down')} disabled={translateLevel === 'A1' || loading}>
                 ⬇️ Easier
