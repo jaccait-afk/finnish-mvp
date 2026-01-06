@@ -97,35 +97,25 @@ export default async function handler(req, res) {
 
   try {
     console.log('Attempting Mistral translation...');
-    console.log('Mistral Key length:', mistralKey.length);
-    console.log('Mistral Key starts with:', mistralKey.substring(0, 10));
     
-    const bodyPayload = {
-      model: 'mistral-large-latest',
-      messages: [{
-        role: 'user',
-        content: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY JSON:\n{"translated": "text", "englishBackTranslation": "English or null"}`
-      }]
-    };
-
-    console.log('Request body prepared');
-    console.log('Full authorization header:', `Bearer ${mistralKey.substring(0, 10)}...`);
-
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
     const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${mistralKey}`, 
-        'Content-Type': 'application/json'
+      headers: {
+        'Authorization': `Bearer ${mistralKey}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(bodyPayload),
-      signal: controller.signal
-    });
+      body: JSON.stringify({
+        model: 'mistral-large-latest',
+        messages: [{
+          role: 'user',
+          content: `Translate this text to ${targetLanguage} at CEFR ${level} level (keep it natural for that level, maintain original meaning, structure sentences appropriately for the level):
 
-    clearTimeout(timeoutId);
+Text: "${text.replace(/"/g, '\\"')}"
+
+Output ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
+        }]
+      })
+    });
 
     console.log('Mistral response received:', mistralResponse.status);
 
