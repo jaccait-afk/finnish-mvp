@@ -14,6 +14,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'MISTRAL_API_KEY not configured' });
   }
 
+  // Helper to extract plain text from any format
+  function extractText(obj) {
+    if (typeof obj === 'string') {
+      try {
+        const parsed = JSON.parse(obj);
+        return extractText(parsed);
+      } catch {
+        return obj;
+      }
+    }
+    if (typeof obj === 'object' && obj !== null) {
+      if (obj.text) return obj.text;
+      if (obj.teksti) return obj.teksti;
+      if (obj.translated) return obj.translated;
+      if (obj.content) return obj.content;
+      if (obj.sisältö) return obj.sisältö;
+      return JSON.stringify(obj);
+    }
+    return String(obj);
+  }
+
   try {
     const mistralResponse = await fetch('https://api.mistral.ai/v1/chat/completions', {
       method: 'POST',
@@ -29,21 +50,20 @@ export default async function handler(req, res) {
 
 Text: "${text.replace(/"/g, '\\"')}"
 
-Output ONLY valid JSON, nothing else:
-{"translated": "translation text here", "englishBackTranslation": "English translation of the translated text (null if target is English)"}`
+Output ONLY valid JSON with plain text strings (no nested objects):
+{"translated": "simple translation text here", "englishBackTranslation": "English version here or null if target is English"}`
         }]
       })
     });
 
     if (!mistralResponse.ok) {
-      console.error('Mistral error:', mistralResponse.status);
       throw new Error(`Mistral API error: ${mistralResponse.status}`);
     }
 
     const data = await mistralResponse.json();
     let content = data.choices[0].message.content.trim();
     
-    // Strip markdown code blocks if present
+    // Strip markdown code blocks
     if (content.startsWith('```')) {
       content = content.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
@@ -52,7 +72,7 @@ Output ONLY valid JSON, nothing else:
     try {
       parsed = JSON.parse(content);
     } catch (parseError) {
-      console.error('Mistral JSON parse error:', parseError, 'Content:', content);
+      console.error('JSON parse error:', parseError);
       return res.json({
         translated: content,
         englishBackTranslation: null,
@@ -62,9 +82,13 @@ Output ONLY valid JSON, nothing else:
       });
     }
 
+    // Flatten nested objects to plain text
+    const translated = extractText(parsed.translated);
+    const englishBackTranslation = parsed.englishBackTranslation ? extractText(parsed.englishBackTranslation) : null;
+
     return res.json({
-      translated: typeof parsed.translated === 'string' ? parsed.translated : JSON.stringify(parsed.translated),
-      englishBackTranslation: parsed.englishBackTranslation || null,
+      translated,
+      englishBackTranslation,
       targetLanguage,
       level,
       model: 'Mistral'
@@ -85,7 +109,7 @@ Output ONLY valid JSON, nothing else:
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation", "englishBackTranslation": "English version or null"}`
+              text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
             }]
           }]
         })
@@ -98,7 +122,7 @@ Output ONLY valid JSON, nothing else:
       const geminiData = await geminiResponse.json();
       let geminiContent = geminiData.candidates.content.parts.text.trim();
 
-      // Strip markdown if present
+      // Strip markdown
       if (geminiContent.startsWith('```')) {
         geminiContent = geminiContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
@@ -107,7 +131,7 @@ Output ONLY valid JSON, nothing else:
       try {
         parsed = JSON.parse(geminiContent);
       } catch (parseError) {
-        console.error('Gemini JSON parse error:', parseError);
+        console.error('Gemini parse error:', parseError);
         return res.json({
           translated: geminiContent,
           englishBackTranslation: null,
@@ -117,9 +141,12 @@ Output ONLY valid JSON, nothing else:
         });
       }
 
+      const translated = extractText(parsed.translated);
+      const englishBackTranslation = parsed.englishBackTranslation ? extractText(parsed.englishBackTranslation) : null;
+
       return res.json({
-        translated: typeof parsed.translated === 'string' ? parsed.translated : JSON.stringify(parsed.translated),
-        englishBackTranslation: parsed.englishBackTranslation || null,
+        translated,
+        englishBackTranslation,
         targetLanguage,
         level,
         model: 'Gemini'
