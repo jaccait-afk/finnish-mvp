@@ -1,4 +1,6 @@
 export default async function handler(req, res) {
+  console.log('Translate request received:', { method: req.method, body: Object.keys(req.body || {}) });
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -20,10 +22,8 @@ export default async function handler(req, res) {
     }
     if (typeof obj === 'object' && obj !== null) {
       if (obj.text) return obj.text;
-      if (obj.teksti) return obj.teksti;
       if (obj.translated) return obj.translated;
       if (obj.content) return obj.content;
-      if (obj.sisältö) return obj.sisältö;
       return JSON.stringify(obj);
     }
     return String(obj);
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
+                text: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text"}`
               }]
             }]
           })
@@ -51,26 +51,23 @@ export default async function handler(req, res) {
 
       if (geminiResponse.ok) {
         const geminiData = await geminiResponse.json();
-        const geminiContent = geminiData.candidates[0].content.parts[0].text.trim();
-        const cleanContent = geminiContent.startsWith('```') ? geminiContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '') : geminiContent;
-        
-        try {
-          const parsed = JSON.parse(cleanContent);
-          const translated = extractText(parsed.translated);
-          const englishBackTranslation = parsed.englishBackTranslation ? extractText(parsed.englishBackTranslation) : null;
-          console.log(`${model} succeeded`);
-          return { success: true, translated, englishBackTranslation, model };
-        } catch (e) {
-          console.error(`${model} parse error:`, e.message);
-          return { success: true, translated: cleanContent, englishBackTranslation: null, model };
+        if (geminiData.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const geminiContent = geminiData.candidates[0].content.parts[0].text.trim();
+          const cleanContent = geminiContent.startsWith('```') ? geminiContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '') : geminiContent;
+          
+          try {
+            const parsed = JSON.parse(cleanContent);
+            const translated = extractText(parsed.translated);
+            console.log(`${model} succeeded`);
+            return { success: true, translated, model };
+          } catch (e) {
+            console.error(`${model} parse error:`, e.message);
+            return { success: true, translated: cleanContent, model };
+          }
         }
-      } else if (geminiResponse.status === 429) {
-        console.error(`${model} rate limited (429)`);
-        return { success: false, rateLimited: true };
-      } else {
-        console.error(`${model} HTTP error: ${geminiResponse.status}`);
-        return { success: false };
       }
+      console.log(`${model} failed with status ${geminiResponse.status}`);
+      return { success: false };
     } catch (e) {
       console.error(`${model} error:`, e.message);
       return { success: false };
@@ -78,21 +75,25 @@ export default async function handler(req, res) {
   }
 
   const geminiKey = process.env.GEMINI_API_KEY;
-  const geminiModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+  const geminiModels = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 
   if (geminiKey) {
+    console.log('Trying Gemini models...');
     for (const model of geminiModels) {
       const result = await tryGeminiModel(geminiKey, model);
       if (result.success) {
-        return res.json({ ...result, targetLanguage, level });
+        return res.json({ translated: result.translated, model: result.model, targetLanguage, level });
       }
     }
     console.log('All Gemini models failed, trying Mistral...');
+  } else {
+    console.log('No Gemini key, trying Mistral...');
   }
 
   const mistralKey = process.env.MISTRAL_API_KEY;
   if (!mistralKey) {
-    return res.status(500).json({ error: 'MISTRAL_API_KEY not configured' });
+    console.error('No Mistral key configured');
+    return res.status(500).json({ error: 'No API keys configured' });
   }
 
   try {
@@ -108,28 +109,24 @@ export default async function handler(req, res) {
         model: 'mistral-large-latest',
         messages: [{
           role: 'user',
-          content: `Translate this text to ${targetLanguage} at CEFR ${level} level (keep it natural for that level, maintain original meaning, structure sentences appropriately for the level):
-
-Text: "${text.replace(/"/g, '\\"')}"
-
-Output ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslation": "English or null"}`
+          content: `Translate to ${targetLanguage} at CEFR ${level} level:\n\n"${text}"\n\nOutput ONLY valid JSON:\n{"translated": "translation text"}`
         }]
       })
     });
 
-    console.log('Mistral response received:', mistralResponse.status);
+    console.log('Mistral response:', mistralResponse.status);
 
     if (!mistralResponse.ok) {
       const errorText = await mistralResponse.text();
-      console.error('Mistral HTTP error:', mistralResponse.status, errorText);
-      throw new Error(`Mistral HTTP ${mistralResponse.status}: ${errorText}`);
+      console.error('Mistral error:', mistralResponse.status, errorText);
+      return res.status(500).json({ error: `Mistral failed: ${mistralResponse.status}` });
     }
 
     const data = await mistralResponse.json();
-    console.log('Mistral data parsed');
     
-    if (!data.choices || !data.choices || !data.choices.message) {
-      throw new Error('Mistral format error');
+    if (!data.choices?.?.message?.content) {
+      console.error('Mistral format error:', data);
+      return res.status(500).json({ error: 'Mistral format error' });
     }
 
     let content = data.choices.message.content.trim();
@@ -140,16 +137,15 @@ Output ONLY valid JSON:\n{"translated": "translation text", "englishBackTranslat
     try {
       const parsed = JSON.parse(content);
       const translated = extractText(parsed.translated);
-      const englishBackTranslation = parsed.englishBackTranslation ? extractText(parsed.englishBackTranslation) : null;
       console.log('Mistral succeeded');
-      return res.json({ translated, englishBackTranslation, targetLanguage, level, model: 'Mistral' });
+      return res.json({ translated, model: 'Mistral', targetLanguage, level });
     } catch (e) {
       console.error('Mistral parse error:', e.message);
-      return res.json({ translated: content, englishBackTranslation: null, targetLanguage, level, model: 'Mistral' });
+      return res.json({ translated: content, model: 'Mistral', targetLanguage, level });
     }
 
   } catch (mistralError) {
-    console.error('Mistral failed:', mistralError.message);
+    console.error('Mistral exception:', mistralError.message);
     return res.status(500).json({ error: mistralError.message });
   }
 }
